@@ -105,21 +105,6 @@ export default function ProfilePage() {
           </section>
         </div>
       </main>
-      <footer
-        className="sticky bottom-0 z-10 bg-white/90 backdrop-blur dark:bg-gray-950/90"
-        style={{ paddingBottom: 'calc(1rem + var(--safe-bottom))' }}
-      >
-        <div className="mx-auto max-w-screen-sm px-4 sm:px-6">
-          <div className="py-3">
-            <button
-              onClick={() => router.push('/otp')}
-              className="flex h-14 w-full min-w-[84px] max-w-full cursor-pointer items-center justify-center overflow-hidden rounded-full bg-[var(--color-primary)] px-5 text-base font-bold leading-normal tracking-[0.015em] text-gray-900 shadow-lg shadow-[var(--color-primary)]/20 transition-all hover:bg-opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
-            >
-              <span className="truncate">Click to order</span>
-            </button>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }
