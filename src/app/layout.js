@@ -5,6 +5,9 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { usePathname } from 'next/navigation';
 import FooterNav from "./FooterNav";
 import "./globals.css";
+import { InfoProvider } from "./contexts/InfoContext";
+import { CartProvider } from "./contexts/CartContext";
+import { MqttProvider } from "./contexts/MqttContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -39,8 +42,18 @@ export default function RootLayout({ children }) {
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        style={{
+          fontFamily:
+            "'Spline Sans', 'Noto Sans', system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
+        }}
       >
-        {children}
+        <InfoProvider>
+          <MqttProvider>
+            <CartProvider>
+              {children}
+            </CartProvider>
+          </MqttProvider>
+        </InfoProvider>
         {showFooter && <FooterNav />}
       </body>
     </html>

@@ -1,255 +1,186 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Loader from "../Components/Loader";
+import { useInfo } from "../contexts/InfoContext";
+import { useCart } from "../contexts/CartContext";
+import api from "../lib/api";
 
-export default function ProfilePage() {
-    const [loading, setLoading] = useState(true);
-    const router = useRouter();
+export default function FoodItemsPage() {
+  const { info } = useInfo();
+  const router = useRouter();
 
-    useEffect(() => {
-        const timer = setTimeout(() => setLoading(false), 2000);
-        return () => clearTimeout(timer);
-    }, []);
+  const [loading, setLoading] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [foodItems, setFoodItems] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState(1);
 
-    if (loading) {
-        return (
-            <div className="flex min-h-screen items-center justify-center bg-white dark:bg-gray-950">
-                <div className="flex flex-col items-center gap-2">
-                    <div className="loader-spinner" style={{ width: 48, height: 48 }}>
-                        <svg className="animate-spin" viewBox="0 0 50 50">
-                            <circle
-                                className="opacity-25"
-                                cx="25"
-                                cy="25"
-                                r="20"
-                                fill="none"
-                                stroke="#38e07b"
-                                strokeWidth="6"
-                            />
-                            <path
-                                className="opacity-75"
-                                fill="#38e07b"
-                                d="M25 5a20 20 0 0 1 0 40 20 20 0 0 1 0-40zm0 6a14 14 0 1 0 0 28 14 14 0 0 0 0-28z"
-                            />
-                        </svg>
-                    </div>
-                    <span className="text-base font-medium text-gray-700 dark:text-gray-200">Loading...</span>
-                </div>
-            </div>
+  // ✅ use cart context
+  const { cart, addToCart, increaseQty, decreaseQty, cartHasItems } = useCart();
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      setLoading(true);
+      try {
+        const { data } = await api.get(
+          "/get_hotel_menu_categories_list_by_timingId",
+          {
+            params: {
+              company_id: info?.company_id || 0,
+            },
+          }
         );
-    }
+        console.log("🚀 Categories API Response:", data);
+        setCategories(data);
+      } catch (err) {
+        console.error("Error fetching categories:", err);
+        setCategories([]);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    return (
+    const fetchFoodItems = async () => {
+      setLoading(true);
+      try {
+        const { data } = await api.get("/get_food_items_by_category", {
+          params: {
+            company_id: info?.company_id || 0,
+            category_id: selectedCategory || 0,
+          },
+        });
 
-        <div
-            className="relative flex min-h-screen flex-col bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100"
-            style={{ fontFamily: "'Spline Sans', 'Noto Sans', system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" }}
-        >
-            <header className="flex items-center justify-between p-4 top-0 bg-[#111714]/80">
-                <button className="text-white" onClick={() => router.back()}>
-                    <span className="material-symbols-outlined"> arrow_back </span>
-                </button>
-                <h1 className="text-white text-lg font-bold">Room Service</h1>
-                <div className="w-8"></div>
-            </header>
-            <nav
-                className=" bg-gray-100 dark:bg-[#111714]"
+        console.log("🚀 setFoodItems API Response:", data);
+        setFoodItems(data);
+      } catch (err) {
+        console.error("Error fetching food items:", err);
+        setFoodItems([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCategories();
+    fetchFoodItems();
+  }, [selectedCategory]);
+
+  return (
+    <div className="relative flex min-h-screen flex-col bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100">
+      <header className="flex items-center justify-between p-4 top-0 bg-[#111714]/80">
+        <button className="text-white" onClick={() => router.back()}>
+          <span className="material-symbols-outlined"> arrow_back </span>
+        </button>
+        <h1 className="text-white text-lg font-bold">Room Service</h1>
+        <div className="w-8"></div>
+      </header>
+
+      {/* Categories */}
+      <nav className="bg-gray-100 dark:bg-[#111714]">
+        <div className="flex border-b border-gray-300 dark:border-[#3d5245] px-4 gap-6 overflow-x-auto whitespace-nowrap">
+          {categories.map((cat) => (
+            <button
+              key={cat.id}
+              className={`flex flex-col items-center justify-center border-b-2 pb-3 pt-4 bg-transparent transition-colors ${
+                selectedCategory === cat.id
+                  ? "border-b-[var(--primary-color)] text-[var(--primary-color)]"
+                  : "border-b-transparent text-gray-500 dark:text-[#9eb7a8] hover:text-gray-900 dark:hover:text-white"
+              }`}
+              style={
+                selectedCategory === cat.id ? { fontWeight: "bold" } : {}
+              }
+              onClick={() => setSelectedCategory(cat.id)}
             >
-                <div
-                    className="flex border-b border-gray-300 dark:border-[#3d5245] px-4 gap-6 overflow-x-auto whitespace-nowrap"
-                >
-                    <a
-                        className="flex flex-col items-center justify-center border-b-2 border-b-[var(--primary-color)] text-[var(--primary-color)] pb-3 pt-4 bg-transparent"
-                        href="#"
-                    >
-                        <p className="text-sm font-bold">Featured</p>
-                    </a>
-                    <a
-                        className="flex flex-col items-center justify-center border-b-2 border-b-transparent text-gray-500 dark:text-[#9eb7a8] pb-3 pt-4 hover:text-gray-900 dark:hover:text-white transition-colors bg-transparent"
-                        href="#"
-                    >
-                        <p className="text-sm font-bold">Breakfast</p>
-                    </a>
-                    <a
-                        className="flex flex-col items-center justify-center border-b-2 border-b-transparent text-gray-500 dark:text-[#9eb7a8] pb-3 pt-4 hover:text-gray-900 dark:hover:text-white transition-colors bg-transparent"
-                        href="#"
-                    >
-                        <p className="text-sm font-bold">Lunch</p>
-                    </a>
-                    <a
-                        className="flex flex-col items-center justify-center border-b-2 border-b-transparent text-gray-500 dark:text-[#9eb7a8] pb-3 pt-4 hover:text-gray-900 dark:hover:text-white transition-colors bg-transparent"
-                        href="#"
-                    >
-                        <p className="text-sm font-bold">Dinner</p>
-                    </a>
-                    <a
-                        className="flex flex-col items-center justify-center border-b-2 border-b-transparent text-gray-500 dark:text-[#9eb7a8] pb-3 pt-4 hover:text-gray-900 dark:hover:text-white transition-colors bg-transparent"
-                        href="#"
-                    >
-                        <p className="text-sm font-bold">Drinks</p>
-                    </a>
-                    <a
-                        className="flex flex-col items-center justify-center border-b-2 border-b-transparent text-gray-500 dark:text-[#9eb7a8] pb-3 pt-4 hover:text-gray-900 dark:hover:text-white transition-colors bg-transparent"
-                        href="#"
-                    >
-                        <p className="text-sm font-bold">Desserts</p>
-                    </a>
-                </div>
-            </nav>
-            <main className="flex-1 overflow-y-auto p-4 space-y-6">
-                <section>
-                    <h2
-                        className="text-gray-900 dark:text-white text-2xl font-bold tracking-tight px-4 pb-4 pt-2"
-                    >
-                        Popular
-                    </h2>
-                    <div className="space-y-4">
-                        <div
-                            className="flex flex-col gap-4 rounded-xl p-4 bg-gray-100 dark:bg-[#1c2620] hover:bg-gray-200 dark:hover:bg-[#29382f] transition-colors cursor-pointer"
-                        >
-                            <div className="flex items-start justify-between gap-4">
-                                <div className="flex flex-col gap-1 flex-1">
-                                    <p className="text-gray-900 dark:text-white text-lg font-bold">
-                                        Classic Eggs Benedict
-                                    </p>
-                                    <p className="text-gray-500 dark:text-[#9eb7a8] text-sm">
-                                        Poached eggs, Canadian bacon, English muffin, hollandaise
-                                        sauce
-                                    </p>
-                                    <p className="text-gray-900 dark:text-white font-bold mt-2">
-                                        $18.00
-                                    </p>
-                                </div>
-                                <div
-                                    className="w-28 h-28 bg-center bg-no-repeat bg-cover rounded-lg shrink-0"
-                                    style={{
-                                        backgroundImage: `url('https://lh3.googleusercontent.com/aida-public/AB6AXuCbrvANzqGts0LiM7k-BJECGWLGsIRpbzwgQCo9t4EvaE--JxgR6yFA-vLlYV6U6rMvyNN61pmtDXUEGbPQgU0Lgd0mMGRJq0VwVvIEqBRbDZRBjiOGUO8j3mAQ4dHpyeKBsSWd5J7cdgQx13GcvnfEk_-QsC8m_yzJnMrVKgNBb08hY4P1GrQ8NRnRv6O41OQeNQJAoff8RAh4PqMnfZjCEzoyqFV3-ZR-yVOPPHmYDiAFOUCC3woS3XMScDBX7k-3vsRtELy_nBw')`
-                                    }}
-                                ></div>
-                            </div>
-
-
-                            <button
-                                className="w-full text-[#111714] dark:text-gray-900 font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors"
-                                style={{ background: "var(--color-primary)" }}
-                            >
-                                <span className="material-symbols-outlined">
-                                    add_shopping_cart
-                                </span>
-                                <span>Add to Cart</span>
-                            </button>
-                        </div>
-
-                    </div>
-                </section>
-                <section>
-                    <h2
-                        className="text-gray-900 dark:text-white text-2xl font-bold tracking-tight px-4 pb-4 pt-5"
-                    >
-                        Breakfast
-                    </h2>
-                    <div className="space-y-4">
-                        <div
-                            className="flex flex-col gap-4 rounded-xl p-4 bg-gray-100 dark:bg-[#1c2620] hover:bg-gray-200 dark:hover:bg-[#29382f] transition-colors cursor-pointer"
-                        >
-                            <div className="flex items-start justify-between gap-4">
-                                <div className="flex flex-col gap-1 flex-1">
-                                    <p className="text-gray-900 dark:text-white text-lg font-bold">
-                                        Pancakes
-                                    </p>
-                                    <p className="text-gray-500 dark:text-[#9eb7a8] text-sm">
-                                        Fluffy pancakes, butter, maple syrup
-                                    </p>
-                                    <p className="text-gray-900 dark:text-white font-bold mt-2">
-                                        $14.00
-                                    </p>
-                                </div>
-                                <div
-                                    className="w-28 h-28 bg-center bg-no-repeat bg-cover rounded-lg shrink-0"
-                                    style={{
-                                        backgroundImage: `url('https://lh3.googleusercontent.com/aida-public/AB6AXuC-dMymewzgof7Y7JirY88OnApm7ywLRAaNpBZT4_PIF7iedl8T1Cq3f_lU-1BtspP2JvBRmmlY24TJ9zo98trpDiyMVvFzgsYk_D45lbaMFaNGPP8PBH0AvzF8d-R6ZfavGv4Y9fV2sKXejedK9c-QOd4AmI8sWla7XLGRVFzO8f1NZPsB3WZBk6HQu-2Jmec-MdGUcn1CA_vwLBrukaFrpxqUg1-ufJ53uu9laiIDjHb-RGouwzCqKXyB1klOP3vLH40ZMed-NeY')`
-                                    }}
-                                ></div>
-                            </div>
-                            <button
-                                style={{ background: "var(--color-primary)" }}
-                                className="w-full bg-[var(--primary-color)] text-[#111714] dark:text-gray-900 font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 hover:bg-green-400 transition-colors"
-                            >
-                                <span className="material-symbols-outlined">
-                                    add_shopping_cart
-                                </span>
-                                <span>Add to Cart</span>
-                            </button>
-                        </div>
-                        <div
-                            className="flex flex-col gap-4 rounded-xl p-4 bg-gray-100 dark:bg-[#1c2620] hover:bg-gray-200 dark:hover:bg-[#29382f] transition-colors cursor-pointer"
-                        >
-                            <div className="flex items-start justify-between gap-4">
-                                <div className="flex flex-col gap-1 flex-1">
-                                    <p className="text-gray-900 dark:text-white text-lg font-bold">
-                                        Waffles
-                                    </p>
-                                    <p className="text-gray-500 dark:text-[#9eb7a8] text-sm">
-                                        Crispy waffles, whipped cream, fresh berries
-                                    </p>
-                                    <p className="text-gray-900 dark:text-white font-bold mt-2">
-                                        $15.00
-                                    </p>
-                                </div>
-                                <div
-                                    className="w-28 h-28 bg-center bg-no-repeat bg-cover rounded-lg shrink-0"
-                                    style={{
-                                        backgroundImage: `url('https://lh3.googleusercontent.com/aida-public/AB6AXuCJEAmLlUo9Q-4S0VomteeI1zv4ixhAykEyKFE_btqHEdBOVEiloKD4OTEomwbyi2Ipe10mvgq-tWsBx8WW6kQNPEf7qRlE4IaqgwGvH55cUDraNlfem_270AjKZtZc9FW_y2RocvpdR1pIJKhsBh_Cov9Y_HY-v1-MBoifhInvmNz-3e1Hh5_dn54HcpM_1p8guVLQH6FTJgj5oGBfnLMfCsKv-JY3M-77EvbuC8js2tbBcCoVXGRI3xipv9CgmKOuEkcM1dMrVCA')`
-                                    }}
-                                ></div>
-                            </div>
-                            <button
-                                style={{ background: "var(--color-primary)" }}
-                                className="w-full bg-[var(--primary-color)] text-[#111714] dark:text-gray-900 font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 hover:bg-green-400 transition-colors"
-                            >
-                                <span className="material-symbols-outlined">
-                                    add_shopping_cart
-                                </span>
-                                <span>Add to Cart</span>
-                            </button>
-                        </div>
-                        <div
-                            className="flex flex-col gap-4 rounded-xl p-4 bg-gray-100 dark:bg-[#1c2620] hover:bg-gray-200 dark:hover:bg-[#29382f] transition-colors cursor-pointer"
-                        >
-                            <div className="flex items-start justify-between gap-4">
-                                <div className="flex flex-col gap-1 flex-1">
-                                    <p className="text-gray-900 dark:text-white text-lg font-bold">
-                                        Omelette
-                                    </p>
-                                    <p className="text-gray-500 dark:text-[#9eb7a8] text-sm">
-                                        Three-egg omelette, choice of fillings
-                                    </p>
-                                    <p className="text-gray-900 dark:text-white font-bold mt-2">
-                                        $17.00
-                                    </p>
-                                </div>
-                                <div
-                                    className="w-28 h-28 bg-center bg-no-repeat bg-cover rounded-lg shrink-0"
-                                    style={{
-                                        backgroundImage: `url('https://lh3.googleusercontent.com/aida-public/AB6AXuCYzLhpB6Y6_h9dWACP1gjrr2lwvryHsrgVp0cmZ2a61es1jPo8r4GKbqPOON9TJ0yRpmOpOGWoma5Yy2HAzFFfpVokCgDnFFwpo5ECNxejp0pW34pvUBE0uQtbgkMA_I-ikfkhwyahcFGsFqyVOyCFO3FfxxnjwYd1V_hqGLaNjFzwkEPxJBz8I9ESYAfOeCCTGRiFBOD6w8HSCEVjVuiK8fqjFA1sfUQUgpsHGoryn_bLleCCTZwGMlmqpPbU1SYblXhGMXPqE1s')`
-                                    }}
-                                ></div>
-                            </div>
-                            <button
-                                style={{ background: "var(--color-primary)" }}
-                                className="w-full bg-[var(--primary-color)] text-[#111714] dark:text-gray-900 font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 hover:bg-green-400 transition-colors"
-                            >
-                                <span className="material-symbols-outlined">
-                                    add_shopping_cart
-                                </span>
-                                <span>Add to Cart</span>
-                            </button>
-                        </div>
-                    </div>
-                </section>
-                
-            </main>
-
+              <p className="text-sm font-bold">{cat.name}</p>
+            </button>
+          ))}
         </div>
-    );
+      </nav>
+
+      {/* Food Items */}
+      <main className="flex-1 overflow-y-auto p-4 space-y-6 pb-24">
+        {loading ? <Loader /> : null}
+        <section>
+          <div className="space-y-4">
+            {foodItems
+              .filter((item) => item.category_id === selectedCategory)
+              .map((item) => (
+                <div
+                  key={item.id}
+                  className="flex flex-col gap-4 rounded-xl p-4 bg-gray-100 dark:bg-[#1c2620] hover:bg-gray-200 dark:hover:bg-[#29382f] transition-colors cursor-pointer"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex flex-col gap-1 flex-1">
+                      <p className="text-gray-900 dark:text-white text-lg font-bold">
+                        {item.name}
+                      </p>
+                      <p className="text-gray-500 dark:text-[#9eb7a8] text-sm">
+                        {item.description}
+                      </p>
+                      <p className="text-gray-900 dark:text-white font-bold mt-2">
+                        ${item.amount}
+                      </p>
+                    </div>
+                    <div
+                      className="w-28 h-28 bg-center bg-cover rounded-lg shrink-0"
+                      style={{ backgroundImage: `url('${item.item_picture}')` }}
+                    ></div>
+                  </div>
+
+                  {/* Cart controls */}
+                  {cart[item.id] ? (
+                    <div className="flex items-center gap-3 w-full">
+                      <button
+                        className="bg-gray-300 dark:bg-gray-700 text-xl rounded-full w-10 h-10 flex items-center justify-center font-bold"
+                        onClick={() => decreaseQty(item.id)}
+                      >
+                        -
+                      </button>
+                      <span className="font-bold text-lg">
+                        {cart[item.id].qty}
+                      </span>
+                      <button
+                        className="bg-green-500 text-white text-xl rounded-full w-10 h-10 flex items-center justify-center font-bold hover:bg-green-600"
+                        onClick={() => increaseQty(item.id)}
+                      >
+                        +
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      className="w-full bg-primary text-[#111714] dark:text-gray-900 font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors"
+                      onClick={() => addToCart(item)}
+                    >
+                      <span className="material-symbols-outlined">
+                        add_shopping_cart
+                      </span>
+                      <span>Add to Cart</span>
+                    </button>
+                  )}
+                </div>
+              ))}
+          </div>
+        </section>
+      </main>
+
+      {/* Proceed to Order */}
+      {cartHasItems && (
+        <div className="fixed bottom-0 left-0 w-full p-4 bg-white dark:bg-[#111714] border-t border-gray-200 dark:border-[#3d5245] z-50">
+          <div className="w-full flex items-center justify-center">
+            <button
+              className="w-full text-[#111714] bg-primary max-w-md relative flex items-center justify-center gap-2 font-bold py-3 px-4 rounded-full overflow-hidden group focus:outline-none border-0"
+              type="button"
+              onClick={() => router.push("/proceed-order")}
+            >
+              <span className="relative z-10 flex items-center gap-2 w-full justify-center">
+                <span className="material-symbols-outlined">
+                  add_shopping_cart
+                </span>
+                <span> Proceed to Order</span>
+              </span>
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
