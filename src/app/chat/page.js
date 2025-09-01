@@ -1,160 +1,573 @@
-"use client";
-import { useEffect, useState, useRef } from "react";
-import { useRouter } from "next/navigation";
-import TestComp from "../Components/test";
-import Loader from "../Components/Loader";
+// Chat.js
+"use client"
+import React, { useState, useEffect, useRef } from "react";
+import mqtt from "mqtt";
+import axios from "axios";
 import api from "../lib/api";
-import { useInfo } from "../contexts/InfoContext";
-import { useMqttContext } from "../contexts/MqttContext";
 
+import { useInfo } from "../contexts/InfoContext"
+import Loader from "../Components/Loader";
 
-export default function ChatPage() {
+const MQTT_URL = "wss://mqtt.xtremeguard.org:8084";
 
-    const mqtt = useMqttContext();
-    const [unsubscribe, setUnsubscribe] = useState(null);
+function topicMatches(pattern, topic) {
+    if (pattern === topic) return true;
+    const p = pattern.split("/");
+    const t = topic.split("/");
+    for (let i = 0; i < p.length; i++) {
+        const pp = p[i];
+        const tt = t[i];
+        if (pp === "#") return true;
+        if (pp === "+") continue;
+        if (tt === undefined || pp !== tt) return false;
+    }
+    return p.length === t.length;
+}
 
+function useMqtt() {
+    const [client, setClient] = useState(null);
 
     useEffect(() => {
-        // Subscribe once when the component mounts
-        let topic = `chat/hotel/3/room/2524/message`;
-
-        console.log(topic);
-
-
-        const unsub = mqtt.sub(topic, (msg, topic) => {
-            console.log("Received:", msg, "from", topic);
+        const c = mqtt.connect(MQTT_URL, {
+            clean: true,
+            reconnectPeriod: 2000,
+            connectTimeout: 10000,
         });
+        setClient(c);
+        return () => c.end();
+    }, []);
 
-        setUnsubscribe(() => unsub); // store unsubscribe function
+    const pub = (topic, payload, options) => {
+        if (!client) return;
+        let data = payload;
+        if (typeof payload !== "string") {
+            try {
+                data = JSON.stringify(payload);
+            } catch {
+                data = String(payload);
+            }
+        }
+        client.publish(topic, data, options || {});
+    };
 
-        // Cleanup on unmount
-        return () => {
-            if (unsubscribe) unsubscribe();
+    const sub = (topic, handler) => {
+        if (!client) return () => { };
+        const onMessage = (actualTopic, buf) => {
+            if (typeof actualTopic !== "string") return;
+            if (!topicMatches(topic, actualTopic)) return;
+            let parsed = null;
+            const text = buf ? buf.toString() : "";
+            try {
+                parsed = JSON.parse(text);
+            } catch {
+                parsed = text;
+            }
+            handler(parsed, actualTopic);
         };
-    }, [mqtt]);
+        client.on("message", onMessage);
+        client.subscribe(topic, (err) => {
+            if (err) console.error("MQTT subscribe error:", err, "topic=", topic);
+        });
+        return () => {
+            try {
+                client.removeListener("message", onMessage);
+            } catch { }
+            try {
+                client.unsubscribe(topic);
+            } catch { }
+        };
+    };
 
-    const router = useRouter();
+    return { pub, sub, client };
+}
+
+function getSecondsInTimezone(timeZone) {
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat("en-US", {
+        timeZone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+    });
+    const parts = {};
+    formatter.formatToParts(now).forEach(({ type, value }) => {
+        parts[type] = value;
+    });
+    const localTimeString = `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}`;
+    return Math.floor(new Date(localTimeString).getTime());
+}
+
+export default function Chat() {
+
     const { info } = useInfo();
-    const [loading, setLoading] = useState(true);
+    const [mounted, setMounted] = useState(false);
     const [messages, setMessages] = useState([]);
-    const [newMessage, setNewMessage] = useState("");
-    const chatEndRef = useRef(null);
+    const [chatInfo, setChatInfo] = useState({
+        hotelId: 0,
+        bookingId: 0,
+        bookingRoomId: 0,
+        roomId: 0,
+        roomNumber: "000",
+        customer: {},
+        title: "Mr",
+        full_name: "New User",
+        guestName: "Mr.New User"
+    });
 
     useEffect(() => {
-        const fetchMessages = async () => {
-            try {
-                const { data } = await api.get("/chat_messages_history", {
-                    params: {
-                        company_id: info?.company_id || 3,
-                        role: "guest",
-                        booking_room_id: info?.booking_rooms_id || 2524,
-                        limit: 50,
-                    },
-                });
-                setMessages(data);
-            } catch (err) {
-                console.error("Error fetching chat messages:", err);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchMessages();
+        if (info) {
+            const customer = info?.customer || {};
+            const title = customer.title || "Mr";
+            const full_name = customer.full_name || "New User";
+            setChatInfo({
+                hotelId: info.company_id || 0,
+                bookingId: info.booking_id || 0,
+                bookingRoomId: info.record_id || 0,
+                roomId: info.room_id || 0,
+                roomNumber: info.room_no || "000",
+                customer,
+                title,
+                full_name,
+                guestName: title + "." + full_name
+            });
+        }
     }, [info]);
 
-    const handleSend = async () => {
-        if (!newMessage.trim()) return;
+    useEffect(() => {
+        console.log("🚀 ~ info:", info);
+        console.log("🚀 ~ Chat ~ hotelId:", chatInfo.hotelId);
+        console.log("🚀 ~ Chat ~ bookingId:", chatInfo.bookingId);
+        console.log("🚀 ~ Chat ~ bookingRoomId:", chatInfo.bookingRoomId);
+        console.log("🚀 ~ Chat ~ roomId:", chatInfo.roomId);
+        console.log("🚀 ~ Chat ~ roomNumber:", chatInfo.roomNumber);
+        console.log("🚀 ~ Chat ~ guestName:", chatInfo.guestName);
+    }, [info, chatInfo]);
 
-        // setMessages([
-        //     ...messages,
-        //     {
-        //         id: Date.now(),
-        //         role: "guest",
-        //         sender: "You",
-        //         text: newMessage,
-        //         ts: new Date().toISOString(),
-        //     },
-        // ]);
-        // setNewMessage("");
 
-        let topic = `chat/hotel/3/room/2524/message`;
+    // Removed duplicate useState declarations below (was causing redeclaration errors)
+    const [draft, setDraft] = useState("");
+    const [typingSet, setTypingSet] = useState(new Set());
+    const [selectedFile, setSelectedFile] = useState(null);
+    const [previewImageUrl, setPreviewImageUrl] = useState(null);
+    const [dialogPreviewImage, setDialogPreviewImage] = useState(false);
+    const [previewImageId, setPreviewImageId] = useState(null);
+    const [recording, setRecording] = useState(false);
+    const [mediaRecorder, setMediaRecorder] = useState(null);
+    const [chunks, setChunks] = useState([]);
+    const [seconds, setSeconds] = useState(0);
+    const [startTs, setStartTs] = useState(null);
+    const [timezone] = useState("Asia/Kolkata");
+    const [typingTimers, setTypingTimers] = useState({});
+    const [tmr, setTmr] = useState(null);
 
-        // Current UTC timestamp (ms)
+    const { pub, sub } = useMqtt();
+    const listRef = useRef();
+    const fileInputRef = useRef();
+    const messageInputRef = useRef();
+
+    const me = `${chatInfo.roomNumber}:${chatInfo.guestName}`;
+    const msgTopic = `chat/hotel/${chatInfo.hotelId}/room/${String(chatInfo.bookingRoomId)}/message`;
+    const typingTopic = `chat/hotel/${chatInfo.hotelId}/room/${String(chatInfo.bookingRoomId)}/typing`;
+    const ackTopic = `chat/hotel/${chatInfo.hotelId}/room/${String(chatInfo.bookingRoomId)}/ack`;
+
+    // Load history
+    useEffect(() => {
+        async function loadHistory() {
+            try {
+                const q = `?company_id=${chatInfo.hotelId}&role=guest&booking_room_id=${chatInfo.bookingRoomId}&limit=50`;
+                const rows = await api.get(`/chat_messages_history${q}`);
+                console.log("🚀 ~ loadHistory ~ rows:", rows)
+                setMessages(
+                    (rows.data || []).sort((a, b) => (a.tsDb || 0) - (b.tsDb || 0))
+                );
+                setTimeout(scrollToEnd, 100);
+            } catch { }
+        }
+        loadHistory();
+        // eslint-disable-next-line
+    }, [chatInfo.hotelId, chatInfo.bookingRoomId]);
+
+    // MQTT subscriptions
+    useEffect(() => {
+        // Message subscription
+        const unsubMsg = sub(msgTopic, (m) => {
+            if (!m) return;
+            upsertMessage(m);
+            if (m.role === "reception") {
+                setTimeout(() => {
+                    scrollToEnd();
+                    ack(m.id);
+                }, 0);
+            } else {
+                setTimeout(scrollToEnd, 0);
+            }
+        });
+
+        // Typing subscription
+        const unsubTyping = sub(typingTopic, (t) => {
+            const timerKey = `typing:${t?.user || ""}`;
+            clearTimeout(typingTimers[timerKey]);
+            if (t && t.typing) {
+                setTypingSet((prev) => new Set(prev).add(t.user));
+                const timer = setTimeout(() => {
+                    setTypingSet((prev) => {
+                        const newSet = new Set(prev);
+                        newSet.delete(t.user);
+                        return newSet;
+                    });
+                }, 3000);
+                setTypingTimers((prev) => ({ ...prev, [timerKey]: timer }));
+            } else {
+                setTypingSet((prev) => {
+                    const newSet = new Set(prev);
+                    newSet.delete(t && t.user);
+                    return newSet;
+                });
+            }
+        });
+
+        // ACK subscription
+        const unsubAck = sub(ackTopic, (ackMsg) => {
+            const { lastSeenId } = ackMsg || {};
+            if (!lastSeenId) return;
+            setMessages((msgs) =>
+                msgs.map((x) =>
+                    x.id === lastSeenId && x.role === "guest" && !x.seen
+                        ? { ...x, seen: true }
+                        : x
+                )
+            );
+        });
+
+        return () => {
+            unsubMsg && unsubMsg();
+            unsubTyping && unsubTyping();
+            unsubAck && unsubAck();
+            Object.values(typingTimers).forEach((t) => clearTimeout(t));
+        };
+        // eslint-disable-next-line
+    }, [msgTopic, typingTopic, ackTopic, sub]);
+
+    // Focus input on mount
+    useEffect(() => {
+        if (messageInputRef.current) messageInputRef.current.focus();
+    }, []);
+
+    function upsertMessage(msg) {
+        setMessages((msgs) => {
+            const i = msgs.findIndex((x) => x.id === msg.id);
+            let newMsgs;
+            if (i === -1) newMsgs = [...msgs, msg];
+            else {
+                newMsgs = [...msgs];
+                newMsgs[i] = { ...msgs[i], ...msg };
+            }
+            newMsgs.sort((a, b) => (a.tsDb || 0) - (b.tsDb || 0));
+            return newMsgs;
+        });
+    }
+
+    function scrollToEnd() {
+        if (listRef.current) {
+            listRef.current.scrollTop = listRef.current.scrollHeight;
+        }
+    }
+
+    function prettyUser(u) {
+        const [, name] = String(u || "").split(":");
+        return name || u;
+    }
+
+    function prettySender(s) {
+        if (!s) return "";
+        if (String(s).startsWith("Reception:")) return s;
+        return "Me (" + s + ")";
+    }
+
+    function time(ts) {
+        const date = new Date(ts);
         const now = new Date();
+        const isToday =
+            date.getDate() === now.getDate() &&
+            date.getMonth() === now.getMonth() &&
+            date.getFullYear() === now.getFullYear();
+        if (isToday) {
+            return date.toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+            });
+        } else {
+            return (
+                date.toLocaleDateString([], {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                }) +
+                " " +
+                date.toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                })
+            );
+        }
+    }
 
-        // Format the time in the target timezone
-        const formatter = new Intl.DateTimeFormat("en-US", {
-            timezone:"Asia/Kolkata",
-            year: "numeric",
-            month: "2-digit",
-            day: "2-digit",
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-            hour12: false,
+    function handleFileSelect(e) {
+        setSelectedFile(e.target.files[0] || null);
+    }
+
+    async function sendTyping() {
+        pub(typingTopic, {
+            user: me,
+            typing: true,
+            ts: getSecondsInTimezone(timezone),
+            tsDb: Date.now(),
         });
+        setTimeout(() => {
+            pub(typingTopic, {
+                user: me,
+                typing: false,
+                ts: getSecondsInTimezone(timezone),
+                tsDb: Date.now(),
+            });
+        }, 1200);
+    }
 
-        // Extract date/time parts
-        const parts = {};
-        formatter.formatToParts(now).forEach(({ type, value }) => {
-            parts[type] = value;
-        });
-
-        // Build a date string as if it's local time in that timezone
-        const localTimeString = `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}`;
-
+    async function send() {
+        if (selectedFile) {
+            await sendFile();
+            return false;
+        }
+        const text = draft.trim();
+        if (!text) return;
         let m = {
-            "id": "1756568110450_2524",
-            "sender": "307:Mr.New User",
+            id: Date.now() + "_" + chatInfo.bookingRoomId,
+            sender: me,
             tsString: new Date().toLocaleString("en-US", {
-                 timezone:"Asia/Kolkata",
+                timeZone: timezone,
                 year: "numeric",
                 month: "2-digit",
                 day: "2-digit",
                 hour: "2-digit",
                 minute: "2-digit",
             }),
-            "role": "guest",
-            "type": "text",
-            "text": "text--" + Date.now(),
-            "ts": Math.floor(new Date(localTimeString).getTime()),
+            role: "guest",
+            type: "text",
+            text,
+            ts: getSecondsInTimezone(timezone),
             tsDb: Date.now(),
-            "booking_id": "1974",
-            "booking_room_id": "2524",
-            "room_id": "100",
-            "room_number": "307",
-            "company_id": "3"
+            booking_id: chatInfo.bookingId,
+            booking_room_id: chatInfo.bookingRoomId,
+            room_id: chatInfo.roomId,
+            room_number: chatInfo.roomNumber,
+            company_id: chatInfo.hotelId,
+        };
+        pub(msgTopic, m);
+        upsertMessage(m);
+        setDraft("");
+        setTimeout(scrollToEnd, 0);
+        ack(m.id);
+        await sendTyping();
+        setTimeout(scrollToEnd, 0);
+        try {
+            await api.post(`/chat_messages`, m);
+        } catch { }
+    }
+
+    async function sendFile() {
+        if (!selectedFile) return;
+        try {
+            const form = new FormData();
+            form.append("file", selectedFile);
+            form.append("sender", me);
+            form.append("role", "guest");
+            form.append("type", "file");
+            form.append("ts", Date.now());
+            form.append("booking_id", chatInfo.bookingId);
+            form.append("booking_room_id", chatInfo.bookingRoomId);
+            form.append("room_id", chatInfo.roomId);
+            form.append("room_number", chatInfo.roomNumber);
+            form.append("company_id", chatInfo.hotelId);
+            const res = await axios.post("/chat_messages_upload_file", form);
+            const url = res && res.data.message.url;
+            if (url === "null") {
+                alert("File Upload Failed");
+                return false;
+            }
+            const m = {
+                id: Date.now() + "_" + chatInfo.bookingRoomId,
+                sender: me,
+                role: "guest",
+                type: "file",
+                url: url,
+                filename: "image",
+                ts: getSecondsInTimezone(timezone),
+                tsString: new Date().toLocaleString("en-US", {
+                    timeZone: timezone,
+                    year: "numeric",
+                    month: "2-digit",
+                    day: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                }),
+                tsDb: Date.now(),
+                booking_id: chatInfo.bookingId,
+                booking_room_id: chatInfo.bookingRoomId,
+                room_id: chatInfo.roomId,
+                room_number: chatInfo.roomNumber,
+                company_id: chatInfo.hotelId,
+            };
+            pub(msgTopic, m);
+            upsertMessage(m);
+            setTimeout(scrollToEnd, 0);
+            ack(m.id);
+            await sendTyping();
+            setTimeout(scrollToEnd, 0);
+        } catch (err) {
+            alert("Upload failed");
+        } finally {
+            if (fileInputRef.current) fileInputRef.current.value = "";
         }
+        setSelectedFile(null);
+    }
 
-        mqtt.pub(topic, m); // ✅ publish a plain object
+    function viewImage(messageId, url) {
+        setPreviewImageId(messageId);
+        setPreviewImageUrl(url);
+        setDialogPreviewImage(true);
+    }
 
-        let r = await api.post(`/chat_messages`, m);
+    function ack(id) {
+        pub(ackTopic, {
+            user: me,
+            lastSeenId: id,
+            ts: getSecondsInTimezone(timezone),
+            tsDb: Date.now(),
+        });
+    }
 
-        console.log(r);
-        
-    };
+    // Audio recording
+    async function startRec() {
+        const candidates = [
+            "audio/webm;codecs=opus",
+            "audio/webm",
+            "audio/mp4",
+        ];
+        let mimeType = "";
+        for (const c of candidates) {
+            if (window.MediaRecorder.isTypeSupported(c)) {
+                mimeType = c;
+                break;
+            }
+        }
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mr = new window.MediaRecorder(stream, mimeType ? { mimeType } : {});
+        setMediaRecorder(mr);
+        setChunks([]);
+        mr.ondataavailable = (e) => e.data.size && setChunks((prev) => [...prev, e.data]);
+        mr.start();
+        setRecording(true);
+        setStartTs(Date.now());
+        setSeconds(0);
+        const interval = setInterval(() => {
+            setSeconds(Math.round((Date.now() - startTs) / 1000));
+        }, 200);
+        setTmr(interval);
+        mr.onstop = async () => {
+            clearInterval(interval);
+            if (mr.stream) {
+                mr.stream.getTracks().forEach((track) => track.stop());
+            }
+            setRecording(false);
+            const blob = new Blob(chunks, {
+                type: mr.mimeType || "audio/webm",
+            });
+            const durationMs = Date.now() - startTs;
+            const form = new FormData();
+            form.append("sender", me);
+            form.append("role", "guest");
+            form.append("type", "audio");
+            form.append("ts", Date.now());
+            form.append("booking_id", chatInfo.bookingId);
+            form.append("booking_room_id", chatInfo.bookingRoomId);
+            form.append("room_id", chatInfo.roomId);
+            form.append("room_number", chatInfo.roomNumber);
+            form.append("company_id", chatInfo.hotelId);
+            form.append("durationMs", durationMs.toString());
+            form.append(
+                "file",
+                blob,
+                `voice_${bookingRoomId}.${fileExt(blob.type)}`
+            );
+            const res = await axios.post("/chat_messages_upload_file", form);
+            const url = res && res.data.message.url;
+            if (url === "null") {
+                alert("File Upload Failed");
+                return false;
+            }
+            const m = {
+                id: Date.now() + "" + bookingRoomId,
+                sender: me,
+                tsString: new Date().toLocaleString("en-US", {
+                    timeZone: timezone,
+                    year: "numeric",
+                    month: "2-digit",
+                    day: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                }),
+                role: "guest",
+                type: "audio",
+                url: url,
+                filename: "image",
+                ts: getSecondsInTimezone(timezone),
+                tsDb: Date.now(),
+                booking_id: chatInfo.bookingId,
+                booking_room_id: chatInfo.bookingRoomId,
+                room_id: chatInfo.roomId,
+                room_number: chatInfo.roomNumber,
+                company_id: chatInfo.hotelId,
+                audio: url,
+            };
+            pub(msgTopic, m);
+            upsertMessage(m);
+            setTimeout(scrollToEnd, 0);
+            ack(m.id);
+            await sendTyping();
+            setTimeout(scrollToEnd, 0);
+        };
+    }
 
-    // Scroll to latest message
-    useEffect(() => {
-        chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages]);
+    function stopRec() {
+        if (mediaRecorder) {
+            mediaRecorder.stop();
+        }
+    }
 
-    const formatTime = (ts) => {
-        const date = new Date(ts);
-        return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    };
-
-    if (loading) return <Loader />;
+    function fileExt(mime) {
+        if (
+            mime.includes("mp4") ||
+            mime.includes("x-m4a") ||
+            mime.includes("aac")
+        )
+            return "m4a";
+        if (mime.includes("webm")) return "webm";
+        if (mime.includes("ogg")) return "ogg";
+        return "dat";
+    }
 
     return (
-        <div className="flex flex-col min-h-screen bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100">
-            {/* Header */}
+        <div ref={listRef} className="flex flex-col min-h-screen bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100">
             <header className="flex items-center justify-between p-4 sticky top-0 z-10 bg-white/80 backdrop-blur-sm dark:bg-gray-950/80">
                 <div className="mx-auto max-w-screen-sm w-full flex justify-between items-center">
                     <button className="text-gray-700 dark:text-gray-200" onClick={() => router.push("/")}>
                         <span className="material-symbols-outlined">arrow_back</span>
                     </button>
-                    <h1 className="text-lg font-bold text-gray-900 dark:text-gray-100">Chat</h1>
+                    <h1 className="text-lg font-bold text-gray-900 dark:text-gray-100">Chat Room : {chatInfo.roomNumber}</h1>
                     <div className="w-8"></div>
                 </div>
             </header>
@@ -179,7 +592,7 @@ export default function ChatPage() {
                         <div className={`flex flex-col ${msg.role === "guest" ? "items-end" : ""}`}>
                             <div className="flex items-baseline gap-2">
                                 <p className="font-bold">{msg.role === "guest" ? "You" : "Reception"}</p>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">{formatTime(msg.ts)}</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">{time(msg.ts)}</p>
                             </div>
                             <div
                                 className={`mt-1 max-w-xs p-3 rounded-lg ${msg.role === "guest"
@@ -187,44 +600,198 @@ export default function ChatPage() {
                                     : "bg-gray-900 text-white rounded-tl-none"
                                     }`}
                             >
-                                <p>{msg.text}</p>
+                                <p className="text-white">{msg.text}</p>
                             </div>
                         </div>
                     </div>
                 ))}
-                <div ref={chatEndRef} />
+                {/* <div ref={chatEndRef} /> */}
             </main>
 
-            {/* Input */}
-            <footer className="bg-white/90 backdrop-blur-sm p-4 sticky bottom-0 dark:bg-gray-950/90">
-                <div className="flex items-center gap-2 relative">
-                    <input
-                        className="flex-1 bg-gray-100 border-none rounded-full h-12 pr-20 pl-5 text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-[var(--color-primary)] dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 focus:outline-none"
-                        placeholder="Type a message..."
-                        type="text"
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                    />
+            <div className="wa-chat max-w-xl mx-auto mt-5">
+                {/* Image Preview Dialog */}
+                {dialogPreviewImage && (
+                    <div
+                        style={{
+                            position: "fixed",
+                            zIndex: 1000,
+                            left: 0,
+                            top: 0,
+                            width: "100vw",
+                            height: "100vh",
+                            background: "rgba(0,0,0,0.5)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                        }}
+                        onClick={() => setDialogPreviewImage(false)}
+                    >
+                        <div
+                            style={{
+                                background: "#fff",
+                                borderRadius: 10,
+                                padding: 20,
+                                maxWidth: 400,
+                                width: "100%",
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                <span>Image</span>
+                                <button onClick={() => setDialogPreviewImage(false)}>✕</button>
+                            </div>
+                            <img
+                                src={previewImageUrl}
+                                alt="Preview"
+                                style={{ width: "100%", borderRadius: 10, marginTop: 10 }}
+                            />
+                        </div>
+                    </div>
+                )}
+                {/* Messages */}
+                {/* <div ref={listRef} className="chat-body" style={{ maxHeight: 400, overflowY: "auto" }}>
+                    {messages.length === 0 && <div className="flex">No Chat History is available</div>}
+                    {messages.map((m) => (
+                        <div
+                            key={m.id}
+                            className={`msg ${m.role === "guest" ? "me" : "them"}`}
+                        >
+                            <div className="bubble">
+                                <div className="meta">
+                                    <span className="sender">{prettySender(m.sender)}</span>
+                                </div>
+                                {m.type === "text" && <div>{m.text}</div>}
+                                {m.type === "file" && (
+                                    <div style={{ textAlign: "center" }}>
+                                        <img
+                                            src={m.url}
+                                            alt="file"
+                                            onClick={() => viewImage(m.id, m.url)}
+                                            style={{
+                                                margin: "auto",
+                                                width: 100,
+                                                borderRadius: 10,
+                                                textAlign: "right",
+                                            }}
+                                        />
+                                    </div>
+                                )}
+                                {m.type === "audio" && (
+                                    <audio
+                                        style={{ height: 28 }}
+                                        src={m.url}
+                                        controls
+                                        controlsList="nodownload"
+                                        preload="none"
+                                    ></audio>
+                                )}
+                                <div
+                                    style={{
+                                        textAlign: m.role === "guest" ? "right" : "left",
+                                    }}
+                                >
+                                    <span
+                                        className="sender"
+                                        style={{
+                                            paddingTop: 5,
+                                            color: "#838383",
+                                            fontSize: 10,
+                                        }}
+                                    >
+                                        {time(m.ts)}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div> */}
+                {/* Composer */}
 
-                    {/* Camera & Mic buttons */}
-                    <div className="absolute right-14 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                        <button className="rounded-full w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">
-                            <span className="material-symbols-outlined text-base">photo_camera</span>
-                        </button>
-                        <button className="rounded-full w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">
-                            <span className="material-symbols-outlined text-base">mic</span>
+
+                <footer className="bg-white/90 backdrop-blur-sm p-4 sticky bottom-0 dark:bg-gray-950/90">
+                    <div className="flex items-center gap-2 relative">
+                        <input
+                            className="flex-1 bg-gray-100 border-none rounded-full h-12 pr-20 pl-5 text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-[var(--color-primary)] dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 focus:outline-none"
+                            placeholder="Type a message..."
+                            type="text"
+
+                            ref={messageInputRef}
+                            value={draft}
+                            onChange={(e) => setDraft(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter" && !e.shiftKey) {
+                                    e.preventDefault();
+                                    send();
+                                }
+                            }}
+                            onInput={sendTyping}
+                        />
+
+                        {/* Camera & Mic buttons */}
+                        <div className="absolute right-14 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                            <button className="rounded-full w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">
+                                <span className="material-symbols-outlined text-base">photo_camera</span>
+                            </button>
+                            <button className="rounded-full w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">
+                                <span className="material-symbols-outlined text-base">mic</span>
+                            </button>
+                        </div>
+
+                        {/* Send button */}
+                        <button
+                            className="bg-[var(--color-primary)] rounded-full w-12 h-12 flex items-center justify-center text-black hover:bg-opacity-80 transition-colors flex-shrink-0"
+                            onClick={send}
+                        >
+                            <span className="material-symbols-outlined">send</span>
                         </button>
                     </div>
+                </footer>
 
-                    {/* Send button */}
+                <div className="composer mt-3 flex1 gap-2" style={{ display: "flex", alignItems: "center" }}>
+                    {/* 
                     <button
-                        className="bg-[var(--color-primary)] rounded-full w-12 h-12 flex items-center justify-center text-black hover:bg-opacity-80 transition-colors flex-shrink-0"
-                        onClick={handleSend}
+                        style={{ color: selectedFile ? "blue" : "black", marginLeft: 4 }}
+                        onClick={() => fileInputRef.current && fileInputRef.current.click()}
                     >
-                        <span className="material-symbols-outlined">send</span>
+                        📎
                     </button>
+                    {selectedFile && (
+                        <button style={{ color: "red" }} onClick={() => setSelectedFile(null)}>
+                            🗑️
+                        </button>
+                    )} */}
+                    <div style={{ margin: "auto" }}>
+                        {/* {!recording ? (
+                            <button
+                                style={{ color: "black", marginTop: 4 }}
+                                onClick={startRec}
+                                disabled={recording}
+                            >
+                                🎤
+                            </button>
+                        ) : (
+                            <span style={{ width: recording ? 120 : 50 }}>
+                                <button
+                                    style={{ color: "red", marginTop: 4 }}
+                                    onClick={stopRec}
+                                    disabled={!recording}
+                                >
+                                    🎤
+                                </button>
+                                <span>{recording && seconds + "s"}</span>
+                            </span>
+                        )} */}
+                    </div>
+                    <input
+                        style={{ display: "none" }}
+                        accept="image/*"
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileSelect}
+                    />
                 </div>
-            </footer>
+            </div>
         </div>
+
     );
 }
