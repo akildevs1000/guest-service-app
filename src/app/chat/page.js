@@ -87,6 +87,8 @@ export default function Chat() {
     const listRef = useRef();
     const fileInputRef = useRef();
     const messageInputRef = useRef();
+    const messagesEndRef = useRef(null);
+
 
     // MQTT subscriptions
     useEffect(() => {
@@ -150,11 +152,13 @@ export default function Chat() {
         // eslint-disable-next-line
     }, [msgTopic, typingTopic, ackTopic, sub]);
 
-    // Focus input on mount
+    // This useEffect will now scroll to the new ref
     useEffect(() => {
-        if (messageInputRef.current) messageInputRef.current.focus();
-        scrollToEnd();
-    }, []);
+        // Check if the ref exists before trying to scroll
+        if (messagesEndRef.current) {
+            messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+    }, [messages]);
 
     // Scroll to bottom whenever messages change
     useEffect(() => {
@@ -521,10 +525,8 @@ export default function Chat() {
                         </div>
                     </div>
                 ))}
-                {/* <div ref={chatEndRef} /> */}
+                <div ref={messagesEndRef} />
             </main>
-
-            <div ref={listRef}></div>
 
             <div className="wa-chat max-w-xl mx-auto mt-5">
                 {/* Image Preview Dialog */}
