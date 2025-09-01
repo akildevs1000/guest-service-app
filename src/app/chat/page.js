@@ -472,7 +472,7 @@ export default function Chat() {
                                         />
                                     </div>
                                 )}
-                                {/* {msg.type === "audio" && (
+                                {msg.type === "audio" && (
                                     <audio
                                         style={{ height: 28 }}
                                         src={msg.url}
@@ -480,7 +480,7 @@ export default function Chat() {
                                         controlsList="nodownload"
                                         preload="none"
                                     ></audio>
-                                )} */}
+                                )}
                             </div>
                         </div>
                     </div>
