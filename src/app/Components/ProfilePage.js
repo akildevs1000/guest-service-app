@@ -157,7 +157,7 @@ export default function ProfilePage() {
                 />
               </label>
 
-              <label className="block">
+              {/* <label className="block">
                 <span className="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-300">
                   Email
                 </span>
@@ -167,7 +167,7 @@ export default function ProfilePage() {
                   value={info?.customer?.email || "---"}
                   readOnly
                 />
-              </label>
+              </label> */}
 
               <label className="block">
                 <span className="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-300">
@@ -180,7 +180,7 @@ export default function ProfilePage() {
                 />
               </label>
 
-              <label className="block">
+              {/* <label className="block">
                 <span className="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-300">
                   Room Category
                 </span>
@@ -189,7 +189,7 @@ export default function ProfilePage() {
                   value={info?.room_type || "---"}
                   readOnly
                 />
-              </label>
+              </label> */}
 
               <label className="block">
                 <span className="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-300">
