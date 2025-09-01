@@ -1,11 +1,13 @@
 // Chat.js
 "use client"
 import React, { useState, useEffect, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
+import time from "../helpers/time";
 import api from "../lib/api";
 import useMqtt from "../lib/mqtt";
 import getSecondsInTimezone from "../helpers/getSecondsInTimezone";
 import { useInfo } from "../contexts/InfoContext"
+import AudioMessage from "../Components/AudioMessage";
 
 export default function Chat() {
 
@@ -79,6 +81,7 @@ export default function Chat() {
     const [chunks, setChunks] = useState([]);
     const [seconds, setSeconds] = useState(0);
     const [startTs, setStartTs] = useState(null);
+    const [audioBlob, setAudioBlob] = useState(null);
     const [timezone] = useState("Asia/Kolkata");
     const [typingTimers, setTypingTimers] = useState({});
     const [tmr, setTmr] = useState(null);
@@ -182,34 +185,6 @@ export default function Chat() {
     function scrollToEnd() {
         if (listRef.current) {
             listRef.current.scrollTop = listRef.current.scrollHeight;
-        }
-    }
-
-    function time(ts) {
-        const date = new Date(ts);
-        const now = new Date();
-        const isToday =
-            date.getDate() === now.getDate() &&
-            date.getMonth() === now.getMonth() &&
-            date.getFullYear() === now.getFullYear();
-        if (isToday) {
-            return date.toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-            });
-        } else {
-            return (
-                date.toLocaleDateString([], {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                }) +
-                " " +
-                date.toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                })
-            );
         }
     }
 
@@ -382,7 +357,8 @@ export default function Chat() {
                 const blob = new Blob(chunks, {
                     type: mr.mimeType || "audio/webm",
                 });
-                // ... rest of your send logic
+
+                await sendAudio(blob);
             };
         } catch (err) {
             if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
@@ -400,6 +376,69 @@ export default function Chat() {
     function stopRec() {
         if (mediaRecorder) {
             mediaRecorder.stop();
+        }
+    }
+
+    async function sendAudio(audioBlob) {
+        if (!audioBlob) return;
+        try {
+            const durationMs = Date.now() - startTs;
+            const form = new FormData();
+            form.append("sender", me);
+            form.append("role", "guest");
+            form.append("type", "audio");
+            form.append("ts", Date.now());
+            form.append("booking_id", chatInfo.bookingId);
+            form.append("booking_room_id", chatInfo.bookingRoomId);
+            form.append("room_id", chatInfo.roomId);
+            form.append("room_number", chatInfo.roomNumber);
+            form.append("company_id", chatInfo.hotelId);
+            form.append("durationMs", durationMs.toString());
+            form.append(
+                "file",
+                audioBlob,
+                `voice_${chatInfo.bookingRoomId}.${fileExt(audioBlob.type)}`
+            );
+            const res = await api.post("/chat_messages_upload_file", form);
+            const url = res && res.data.message.url;
+            if (url === "null") {
+                alert("File Upload Failed");
+                return false;
+            }
+            const m = {
+                id: Date.now() + "_" + chatInfo.bookingRoomId,
+                sender: me,
+                tsString: new Date().toLocaleString("en-US", {
+                    timeZone: timezone,
+                    year: "numeric",
+                    month: "2-digit",
+                    day: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                }),
+                role: "guest",
+                type: "audio",
+                url: url,
+                filename: "voice",
+                ts: getSecondsInTimezone(timezone),
+                tsDb: Date.now(),
+                booking_id: chatInfo.bookingId,
+                booking_room_id: chatInfo.bookingRoomId,
+                room_id: chatInfo.roomId,
+                room_number: chatInfo.roomNumber,
+                company_id: chatInfo.hotelId,
+                audio: url,
+            };
+            pub(msgTopic, m);
+            upsertMessage(m);
+            setTimeout(scrollToEnd, 0);
+            ack(m.id);
+            await sendTyping();
+            setTimeout(scrollToEnd, 0);
+        } catch (err) {
+            alert("Upload failed");
+        } finally {
+            setAudioBlob(null);
         }
     }
 
@@ -450,13 +489,12 @@ export default function Chat() {
                                 <p className="text-xs text-gray-500 dark:text-gray-400">{time(msg.ts)}</p>
                             </div>
                             <div
-                                className={`mt-1 max-w-xs p-3 rounded-lg ${msg.role === "guest"
-                                    ? "text-black rounded-tr-none"
-                                    : "bg-gray-900 text-white rounded-tl-none"
+                                className={`mt-1 p-3 rounded-lg max-w-xs ${msg.role === "guest"
+                                        ? "text-black rounded-tr-none"
+                                        : "bg-gray-900 text-white rounded-tl-none"
                                     }`}
                             >
                                 {msg.type === "text" && <p className="text-white">{msg.text}</p>}
-
                                 {msg.type === "file" && (
                                     <div style={{ textAlign: "center" }}>
                                         <img
@@ -472,15 +510,7 @@ export default function Chat() {
                                         />
                                     </div>
                                 )}
-                                {msg.type === "audio" && (
-                                    <audio
-                                        style={{ height: 28 }}
-                                        src={msg.url}
-                                        controls
-                                        controlsList="nodownload"
-                                        preload="none"
-                                    ></audio>
-                                )}
+                                {msg.type === "audio" && <AudioMessage msg={msg} />}
                             </div>
                         </div>
                     </div>
@@ -562,20 +592,16 @@ export default function Chat() {
                                 <span className="material-symbols-outlined text-base">photo_camera</span>
                             </button>
 
-                            {!recording ? (
-
-                                <button onClick={startRec} disabled={recording} className="rounded-full w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">
+                            {!recording && !audioBlob && (
+                                <button onClick={startRec} className="rounded-full w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">
                                     <span className="material-symbols-outlined text-base">mic</span>
-                                </button>
-
-                            ) : (
-                                <button onClick={stopRec} disabled={!recording} className="rounded-full w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">
-                                    <span className="material-symbols-outlined text-base">mic</span>
-                                    {/* <span>{recording && seconds + "s"}</span> */}
                                 </button>
                             )}
-
-
+                            {recording && (
+                                <button onClick={stopRec} className="rounded-full w-8 h-8 flex items-center justify-center text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-200 transition-colors">
+                                    <span className="material-symbols-outlined text-base">stop_circle</span>
+                                </button>
+                            )}
                         </div>
 
                         {/* Send button */}
