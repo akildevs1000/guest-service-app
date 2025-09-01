@@ -5,6 +5,7 @@ import ServerError from "./ServerError";
 import Button from "./ui/Button";
 import api from "../lib/api";
 import { useInfo } from "../contexts/InfoContext";
+import Loader from "./Loader";
 
 export default function ProfilePage() {
   const { setInfo, info } = useInfo();
@@ -101,7 +102,7 @@ export default function ProfilePage() {
 
   if (!mounted) {
     // Prevent hydration mismatch
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+    return <Loader />;
   }
 
   if (error) {
@@ -135,10 +136,10 @@ export default function ProfilePage() {
 
             <div className="flex flex-col items-center justify-center">
               <p className="text-xl font-bold sm:text-2xl">
-                {loading ? "Loading..." : info?.customer?.full_name || "---"}
+                {info?.customer?.full_name || "---"}
               </p>
               <p className="text-sm text-gray-500 dark:text-gray-400 sm:text-base">
-                {loading ? "Loading..." : info?.customer?.whatsapp || "---"}
+                {info?.customer?.whatsapp || "---"}
               </p>
             </div>
           </div>
@@ -151,7 +152,7 @@ export default function ProfilePage() {
                 </span>
                 <input
                   className="form-input h-12 w-full rounded-xl border border-gray-300 bg-gray-50 p-3 text-base text-gray-900 placeholder:text-gray-400 focus:border-gray-300 focus:outline-0 focus:ring-2 focus:ring-[var(--color-primary)] dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
-                  value={loading ? "Loading..." : info?.customer?.full_name || "---"}
+                  value={info?.customer?.full_name || "---"}
                   readOnly
                 />
               </label>
@@ -163,7 +164,7 @@ export default function ProfilePage() {
                 <input
                   type="email"
                   className="form-input h-12 w-full rounded-xl border border-gray-300 bg-gray-50 p-3 text-base text-gray-900 placeholder:text-gray-400 focus:border-gray-300 focus:outline-0 focus:ring-2 focus:ring-[var(--color-primary)] dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
-                  value={loading ? "Loading..." : info?.customer?.email || "---"}
+                  value={info?.customer?.email || "---"}
                   readOnly
                 />
               </label>
@@ -174,7 +175,7 @@ export default function ProfilePage() {
                 </span>
                 <input
                   className="form-input h-12 w-full rounded-xl border border-gray-300 bg-gray-50 p-3 text-base text-gray-900 placeholder:text-gray-400 focus:border-gray-300 focus:outline-0 focus:ring-2 focus:ring-[var(--color-primary)] dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
-                  value={loading ? "Loading..." : info?.room_no || "---"}
+                  value={info?.room_no || "---"}
                   readOnly
                 />
               </label>
@@ -185,7 +186,7 @@ export default function ProfilePage() {
                 </span>
                 <input
                   className="form-input h-12 w-full rounded-xl border border-gray-300 bg-gray-50 p-3 text-base text-gray-900 placeholder:text-gray-400 focus:border-gray-300 focus:outline-0 focus:ring-2 focus:ring-[var(--color-primary)] dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
-                  value={loading ? "Loading..." : info?.room_type || "---"}
+                  value={info?.room_type || "---"}
                   readOnly
                 />
               </label>
@@ -196,7 +197,7 @@ export default function ProfilePage() {
                 </span>
                 <input
                   className="form-input h-12 w-full rounded-xl border border-gray-300 bg-gray-50 p-3 text-base text-gray-900 placeholder:text-gray-400 focus:border-gray-300 focus:outline-0 focus:ring-2 focus:ring-[var(--color-primary)] dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
-                  value={loading ? "Loading..." : info?.checkin_datetime_only_display || "---"}
+                  value={info?.checkin_datetime_only_display || "---"}
                   readOnly
                 />
               </label>
@@ -207,7 +208,7 @@ export default function ProfilePage() {
                 </span>
                 <input
                   className="form-input h-12 w-full rounded-xl border border-gray-300 bg-gray-50 p-3 text-base text-gray-900 placeholder:text-gray-400 focus:border-gray-300 focus:outline-0 focus:ring-2 focus:ring-[var(--color-primary)] dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
-                  value={loading ? "Loading..." : info?.checkout_datetime_only_display || "---"}
+                  value={info?.checkout_datetime_only_display || "---"}
                   readOnly
                 />
               </label>
