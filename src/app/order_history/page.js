@@ -113,7 +113,7 @@ export default function OrderHistoryPage() {
                                                 </div>
                                                 <div className="flex justify-between items-center mt-2">
                                                     <p className="text-gray-900 dark:text-white font-bold">
-                                                        ${total.toFixed(2)}
+                                                        ₹{total.toFixed(2)}
                                                     </p>
                                                     <p className="text-sm text-gray-500 dark:text-[#9eb7a8]">
                                                         {formatTime(order.request_datetime)}
