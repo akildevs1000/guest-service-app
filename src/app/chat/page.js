@@ -338,8 +338,8 @@ export default function Chat() {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             const mr = new window.MediaRecorder(stream, mimeType ? { mimeType } : {});
             setMediaRecorder(mr);
-            setChunks([]);
-            mr.ondataavailable = (e) => e.data.size && setChunks((prev) => [...prev, e.data]);
+            let localChunks = [];
+            mr.ondataavailable = (e) => e.data.size && localChunks.push(e.data);
             mr.start();
             setRecording(true);
             setStartTs(Date.now());
@@ -354,10 +354,9 @@ export default function Chat() {
                     mr.stream.getTracks().forEach((track) => track.stop());
                 }
                 setRecording(false);
-                const blob = new Blob(chunks, {
+                const blob = new Blob(localChunks, {
                     type: mr.mimeType || "audio/webm",
                 });
-
                 await sendAudio(blob);
             };
         } catch (err) {
