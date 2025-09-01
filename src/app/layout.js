@@ -7,7 +7,6 @@ import FooterNav from "./FooterNav";
 import "./globals.css";
 import { InfoProvider } from "./contexts/InfoContext";
 import { CartProvider } from "./contexts/CartContext";
-import { MqttProvider } from "./contexts/MqttContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -48,11 +47,9 @@ export default function RootLayout({ children }) {
         }}
       >
         <InfoProvider>
-          <MqttProvider>
             <CartProvider>
               {children}
             </CartProvider>
-          </MqttProvider>
         </InfoProvider>
         {showFooter && <FooterNav />}
       </body>

@@ -1,109 +1,17 @@
 // Chat.js
 "use client"
 import React, { useState, useEffect, useRef } from "react";
-import mqtt from "mqtt";
-import axios from "axios";
+import { useRouter, useSearchParams } from "next/navigation";
 import api from "../lib/api";
-
+import useMqtt from "../lib/mqtt";
+import getSecondsInTimezone from "../helpers/getSecondsInTimezone";
 import { useInfo } from "../contexts/InfoContext"
-
-const MQTT_URL = "wss://mqtt.xtremeguard.org:8084";
-
-function topicMatches(pattern, topic) {
-    if (pattern === topic) return true;
-    const p = pattern.split("/");
-    const t = topic.split("/");
-    for (let i = 0; i < p.length; i++) {
-        const pp = p[i];
-        const tt = t[i];
-        if (pp === "#") return true;
-        if (pp === "+") continue;
-        if (tt === undefined || pp !== tt) return false;
-    }
-    return p.length === t.length;
-}
-
-function useMqtt() {
-    const [client, setClient] = useState(null);
-
-    useEffect(() => {
-        const c = mqtt.connect(MQTT_URL, {
-            clean: true,
-            reconnectPeriod: 2000,
-            connectTimeout: 10000,
-        });
-        setClient(c);
-        return () => c.end();
-    }, []);
-
-    const pub = (topic, payload, options) => {
-        if (!client) return;
-        let data = payload;
-        if (typeof payload !== "string") {
-            try {
-                data = JSON.stringify(payload);
-            } catch {
-                data = String(payload);
-            }
-        }
-        client.publish(topic, data, options || {});
-    };
-
-    const sub = (topic, handler) => {
-        if (!client) return () => { };
-        const onMessage = (actualTopic, buf) => {
-            if (typeof actualTopic !== "string") return;
-            if (!topicMatches(topic, actualTopic)) return;
-            let parsed = null;
-            const text = buf ? buf.toString() : "";
-            try {
-                parsed = JSON.parse(text);
-            } catch {
-                parsed = text;
-            }
-            handler(parsed, actualTopic);
-        };
-        client.on("message", onMessage);
-        client.subscribe(topic, (err) => {
-            if (err) console.error("MQTT subscribe error:", err, "topic=", topic);
-        });
-        return () => {
-            try {
-                client.removeListener("message", onMessage);
-            } catch { }
-            try {
-                client.unsubscribe(topic);
-            } catch { }
-        };
-    };
-
-    return { pub, sub, client };
-}
-
-function getSecondsInTimezone(timeZone) {
-    const now = new Date();
-    const formatter = new Intl.DateTimeFormat("en-US", {
-        timeZone,
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: false,
-    });
-    const parts = {};
-    formatter.formatToParts(now).forEach(({ type, value }) => {
-        parts[type] = value;
-    });
-    const localTimeString = `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}`;
-    return Math.floor(new Date(localTimeString).getTime());
-}
 
 export default function Chat() {
 
+    const router = useRouter();
+
     const { info } = useInfo();
-    const [mounted, setMounted] = useState(false);
     const [messages, setMessages] = useState([]);
     const [chatInfo, setChatInfo] = useState({
         hotelId: 0,
@@ -163,7 +71,6 @@ export default function Chat() {
     // Removed duplicate useState declarations below (was causing redeclaration errors)
     const [draft, setDraft] = useState("");
     const [typingSet, setTypingSet] = useState(new Set());
-    const [selectedFile, setSelectedFile] = useState(null);
     const [previewImageUrl, setPreviewImageUrl] = useState(null);
     const [dialogPreviewImage, setDialogPreviewImage] = useState(false);
     const [previewImageId, setPreviewImageId] = useState(null);
@@ -183,11 +90,6 @@ export default function Chat() {
 
     // MQTT subscriptions
     useEffect(() => {
-
-        console.log("🚀 ~ Chat ~ me:", me)
-        console.log("🚀 ~ Chat ~ msgTopic:", msgTopic)
-        console.log("🚀 ~ Chat ~ typingTopic:", typingTopic)
-        console.log("🚀 ~ Chat ~ ackTopic:", ackTopic)
 
         // Message subscription
         const unsubMsg = sub(msgTopic, (m) => {
@@ -251,7 +153,13 @@ export default function Chat() {
     // Focus input on mount
     useEffect(() => {
         if (messageInputRef.current) messageInputRef.current.focus();
+        scrollToEnd();
     }, []);
+
+    // Scroll to bottom whenever messages change
+    useEffect(() => {
+        scrollToEnd();
+    }, [messages]);
 
     function upsertMessage(msg) {
         setMessages((msgs) => {
@@ -271,17 +179,6 @@ export default function Chat() {
         if (listRef.current) {
             listRef.current.scrollTop = listRef.current.scrollHeight;
         }
-    }
-
-    function prettyUser(u) {
-        const [, name] = String(u || "").split(":");
-        return name || u;
-    }
-
-    function prettySender(s) {
-        if (!s) return "";
-        if (String(s).startsWith("Reception:")) return s;
-        return "Me (" + s + ")";
     }
 
     function time(ts) {
@@ -313,8 +210,10 @@ export default function Chat() {
     }
 
     function handleFileSelect(e) {
-        console.log("🚀 ~ handleFileSelect ~ e.target.files[0]:", e.target.files[0])
-        setSelectedFile(e.target.files[0] || null);
+        const file = e.target.files[0] || null;
+        if (file) {
+            sendFile(file);
+        }
     }
 
     async function sendTyping() {
@@ -335,10 +234,6 @@ export default function Chat() {
     }
 
     async function send() {
-        if (selectedFile) {
-            await sendFile();
-            return false;
-        }
         const text = draft.trim();
         if (!text) return;
         let m = {
@@ -375,11 +270,11 @@ export default function Chat() {
         } catch { }
     }
 
-    async function sendFile() {
-        if (!selectedFile) return;
+    async function sendFile(file) {
+        if (!file) return;
         try {
             const form = new FormData();
-            form.append("file", selectedFile);
+            form.append("file", file);
             form.append("sender", me);
             form.append("role", "guest");
             form.append("type", "file");
@@ -429,7 +324,6 @@ export default function Chat() {
         } finally {
             if (fileInputRef.current) fileInputRef.current.value = "";
         }
-        setSelectedFile(null);
     }
 
     function viewImage(messageId, url) {
@@ -558,7 +452,7 @@ export default function Chat() {
     }
 
     return (
-        <div ref={listRef} className="flex flex-col min-h-screen bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100">
+        <div className="flex flex-col min-h-screen bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100">
             <header className="flex items-center justify-between p-4 sticky top-0 z-10 bg-white/80 backdrop-blur-sm dark:bg-gray-950/80">
                 <div className="mx-auto max-w-screen-sm w-full flex justify-between items-center">
                     <button className="text-gray-700 dark:text-gray-200" onClick={() => router.push("/")}>
@@ -629,6 +523,8 @@ export default function Chat() {
                 ))}
                 {/* <div ref={chatEndRef} /> */}
             </main>
+
+            <div ref={listRef}></div>
 
             <div className="wa-chat max-w-xl mx-auto mt-5">
                 {/* Image Preview Dialog */}
@@ -703,12 +599,6 @@ export default function Chat() {
                             <button onClick={() => fileInputRef.current && fileInputRef.current.click()} className="rounded-full w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">
                                 <span className="material-symbols-outlined text-base">photo_camera</span>
                             </button>
-
-                            {/* {selectedFile && (
-                                <button className="rounded-full w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">
-                                    <span className="material-symbols-outlined text-base">eye</span>
-                                </button>
-                            )} */}
 
                             {!recording ? (
 
