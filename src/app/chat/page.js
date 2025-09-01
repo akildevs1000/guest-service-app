@@ -457,7 +457,7 @@ export default function Chat() {
         <div className="flex flex-col min-h-screen bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100">
             <header className="flex items-center justify-between p-4 sticky top-0 z-10 bg-white/80 backdrop-blur-sm dark:bg-gray-950/80">
                 <div className="mx-auto max-w-screen-sm w-full flex justify-between items-center">
-                    <button className="text-gray-700 dark:text-gray-200" onClick={() => router.push("/")}>
+                    <button className="text-gray-700 dark:text-gray-200" onClick={() => router.push("/home")}>
                         <span className="material-symbols-outlined">arrow_back</span>
                     </button>
                     <h1 className="text-lg font-bold text-gray-900 dark:text-gray-100">Chat Room : {chatInfo.roomNumber}</h1>

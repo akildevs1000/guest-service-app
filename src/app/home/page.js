@@ -30,7 +30,7 @@ export default function ProfilePage() {
                     <section className="mt-6 space-y-5 sm:mt-8">
                         <div className="mt-12 space-y-6">
                             <div onClick={() => router.push("/food_items")}
-                                className="group block rounded-xl bg-gray-900 p-6 transition-all duration-300 ease-in-out hover:bg-zinc-700/80 hover:scale-[1.02]"
+                                className="group block rounded-xl bg-gray-900 p-6 transition-all duration-300 ease-in-out hover:bg-zinc-700/80 hover:scale-[1.02] select-none"
                             >
                                 <div className="flex items-center gap-6">
                                     <span
@@ -49,7 +49,7 @@ export default function ProfilePage() {
                                     >
                                 </div>
                             </div>
-                            <div onClick={() => router.push("/chat")} className="group block rounded-xl bg-gray-900 p-6 transition-all duration-300 ease-in-out hover:bg-zinc-700/80 hover:scale-[1.02]" href="#">
+                            <div onClick={() => router.push("/chat")} className="group block rounded-xl bg-gray-900 p-6 transition-all duration-300 ease-in-out hover:bg-zinc-700/80 hover:scale-[1.02] select-none" href="#">
                                 <div className="flex items-center gap-6">
                                     <span className="material-symbols-outlined text-4xl" style={{ color: "var(--color-primary)" }}>chat</span>
                                     <div>
@@ -59,7 +59,7 @@ export default function ProfilePage() {
                                     <span className="material-symbols-outlined ml-auto text-zinc-500 transition-transform duration-300 group-hover:translate-x-1">arrow_forward_ios</span>
                                 </div>
                             </div>
-                            <div onClick={() => router.push("/chat")} className="group block rounded-xl bg-gray-900 p-6 transition-all duration-300 ease-in-out hover:bg-zinc-700/80 hover:scale-[1.02]" href="#">
+                            <div onClick={() => router.push("/chat")} className="group block rounded-xl bg-gray-900 p-6 transition-all duration-300 ease-in-out hover:bg-zinc-700/80 hover:scale-[1.02] select-none" href="#">
                                 <div className="flex items-center gap-6">
                                     <span className="material-symbols-outlined text-4xl" style={{ color: "var(--color-primary)" }}>local_laundry_service</span>
                                     <div>
@@ -69,7 +69,7 @@ export default function ProfilePage() {
                                     <span className="material-symbols-outlined ml-auto text-zinc-500 transition-transform duration-300 group-hover:translate-x-1">arrow_forward_ios</span>
                                 </div>
                             </div>
-                            <div onClick={() => router.push("/chat")} className="group block rounded-xl bg-gray-900 p-6 transition-all duration-300 ease-in-out hover:bg-zinc-700/80 hover:scale-[1.02]" href="#">
+                            <div onClick={() => router.push("/chat")} className="group block rounded-xl bg-gray-900 p-6 transition-all duration-300 ease-in-out hover:bg-zinc-700/80 hover:scale-[1.02] select-none" href="#">
                                 <div className="flex items-center gap-6">
                                     <span className="material-symbols-outlined text-4xl" style={{ color: "var(--color-primary)" }}>cleaning_services</span>
                                     <div>
@@ -79,7 +79,7 @@ export default function ProfilePage() {
                                     <span className="material-symbols-outlined ml-auto text-zinc-500 transition-transform duration-300 group-hover:translate-x-1">arrow_forward_ios</span>
                                 </div>
                             </div>
-                            <div onClick={() => router.push("/chat")} className="group block rounded-xl bg-gray-900 p-6 transition-all duration-300 ease-in-out hover:bg-zinc-700/80 hover:scale-[1.02]" href="#">
+                            <div onClick={() => router.push("/chat")} className="group block rounded-xl bg-gray-900 p-6 transition-all duration-300 ease-in-out hover:bg-zinc-700/80 hover:scale-[1.02] select-none" href="#">
                                 <div className="flex items-center gap-6">
                                     <span className="material-symbols-outlined text-4xl" style={{ color: "var(--color-primary)" }}>local_taxi</span>
                                     <div>
@@ -90,7 +90,7 @@ export default function ProfilePage() {
                                 </div>
                             </div>
                             <div onClick={() => router.push("/checkout")}
-                                className="group block rounded-xl bg-gray-900 p-6 transition-all duration-300 ease-in-out hover:bg-zinc-700/80 hover:scale-[1.02]"
+                                className="group block rounded-xl bg-gray-900 p-6 transition-all duration-300 ease-in-out hover:bg-zinc-700/80 hover:scale-[1.02] select-none"
                             >
                                 <div className="flex items-center gap-6">
                                     <span
