@@ -489,8 +489,8 @@ export default function Chat() {
                             </div>
                             <div
                                 className={`mt-1 p-3 rounded-lg max-w-xs ${msg.role === "guest"
-                                        ? "text-black rounded-tr-none"
-                                        : "bg-gray-900 text-white rounded-tl-none"
+                                    ? "text-black rounded-tr-none"
+                                    : "bg-gray-900 text-white rounded-tl-none"
                                     }`}
                             >
                                 {msg.type === "text" && <p className="text-white">{msg.text}</p>}
@@ -579,37 +579,50 @@ export default function Chat() {
                         />
 
                         {/* Camera & Mic buttons */}
-                        <div className="absolute right-14 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                        <div className="absolute right-17 top-1/2 -translate-y-1/2 flex items-center gap-2">
                             <input
                                 style={{ display: "none" }}
                                 accept="image/*"
                                 type="file"
+                                capture="environment"
                                 ref={fileInputRef}
                                 onChange={handleFileSelect}
                             />
                             <button onClick={() => fileInputRef.current && fileInputRef.current.click()} className="rounded-full w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">
                                 <span className="material-symbols-outlined text-base">photo_camera</span>
                             </button>
-
-                            {!recording && !audioBlob && (
-                                <button onClick={startRec} className="rounded-full w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">
-                                    <span className="material-symbols-outlined text-base">mic</span>
-                                </button>
-                            )}
-                            {recording && (
-                                <button onClick={stopRec} className="rounded-full w-8 h-8 flex items-center justify-center text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-200 transition-colors">
-                                    <span className="material-symbols-outlined text-base">stop_circle</span>
-                                </button>
-                            )}
                         </div>
 
                         {/* Send button */}
-                        <button
-                            className="bg-[var(--color-primary)] rounded-full w-12 h-12 flex items-center justify-center text-black hover:bg-opacity-80 transition-colors flex-shrink-0"
-                            onClick={send}
-                        >
-                            <span className="material-symbols-outlined">send</span>
-                        </button>
+
+                        {draft && (
+                            <button
+                                className="bg-[var(--color-primary)] rounded-full w-12 h-12 flex items-center justify-center text-black hover:bg-opacity-80 transition-colors flex-shrink-0"
+                                onClick={send}
+                            >
+                                <span className="material-symbols-outlined">send</span>
+                            </button>
+                        )}
+
+                        {!draft && !recording && !audioBlob && (
+                            <button
+                                className="bg-[var(--color-primary)] rounded-full w-12 h-12 flex items-center justify-center text-black hover:bg-opacity-80 transition-colors flex-shrink-0"
+                                onClick={startRec}
+                            >
+                                <span className="material-symbols-outlined text-base">mic</span>
+                            </button>
+                        )}
+
+                        {recording && (
+                            <div className="flex items-center gap-2">
+                                <button
+                                    className="bg-red-500 rounded-full w-12 h-12 flex items-center justify-center text-black hover:bg-opacity-80 transition-colors flex-shrink-0"
+                                    onClick={stopRec}
+                                >
+                                    <span className="material-symbols-outlined text-base">mic</span>
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                 </footer>
