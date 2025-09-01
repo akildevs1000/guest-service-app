@@ -6,11 +6,8 @@ import Button from "./ui/Button";
 import api from "../lib/api";
 import { useInfo } from "../contexts/InfoContext";
 
-
 export default function ProfilePage() {
-
   const { setInfo, info } = useInfo();
-
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -23,6 +20,12 @@ export default function ProfilePage() {
   const [error, setError] = useState("");
   const [noDetails, setNoDetails] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  // Hydration-safe: render only after client mount
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Function to fetch data
   const fetchCheckinData = async (otpValue = 0) => {
@@ -60,23 +63,20 @@ export default function ProfilePage() {
 
       const record = data.record;
 
-
-
       if (record) {
-        // here keep it as it is and store globally also so i can access other pages also
-
         const payload = {
           record_id: record.id,
           booking_id: record.booking_id,
           checkin_datetime_only_display: record.checkin_datetime_only_display,
-          checkout_datetime_only_display: record.checkout_datetime_only_display?.replace("---", " 12:00"),
+          checkout_datetime_only_display:
+            record.checkout_datetime_only_display?.replace("---", " 12:00"),
           company_id: record.company_id,
           room_id: record.room_id,
           room_no: record.room_no,
           room_type: record.room_type,
           customer: record.customer,
         };
-        console.log("🚀 ~ fetchCheckinData ~ payload:", payload)
+        console.log("🚀 ~ fetchCheckinData ~ payload:", payload);
 
         setInfo(payload); // ✅ stored globally
 
@@ -84,7 +84,6 @@ export default function ProfilePage() {
           router.push(`/otp`);
           return;
         }
-
       }
     } catch (err) {
       console.error(err);
@@ -95,22 +94,30 @@ export default function ProfilePage() {
   };
 
   useEffect(() => {
-    fetchCheckinData(0); // otp 0 for initial load
-  }, [company_id, room_id, room_no]);
+    if (mounted) {
+      fetchCheckinData(0); // otp 0 for initial load
+    }
+  }, [mounted, company_id, room_id, room_no]);
 
-
+  if (!mounted) {
+    // Prevent hydration mismatch
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
 
   if (error) {
     return <ServerError />;
   }
 
   return (
-    <div
-      className="relative flex min-h-screen flex-col bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100"
-    >
-      <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-sm dark:bg-gray-950/80" style={{ paddingTop: "var(--safe-top)" }}>
+    <div className="relative flex min-h-screen flex-col bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100">
+      <header
+        className="sticky top-0 z-10 bg-white/80 backdrop-blur-sm dark:bg-gray-950/80"
+        style={{ paddingTop: "var(--safe-top)" }}
+      >
         <div className="mx-auto max-w-screen-sm px-4 sm:px-6">
-          <div className="flex items-center justify-center py-3 gap-1">MyHotel2cloud</div>
+          <div className="flex items-center justify-center py-3 gap-1">
+            MyHotel2cloud
+          </div>
         </div>
       </header>
 
@@ -127,64 +134,80 @@ export default function ProfilePage() {
             </div>
 
             <div className="flex flex-col items-center justify-center">
-              <p className="text-xl font-bold sm:text-2xl">{info.customer.full_name}</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400 sm:text-base">{info.customer.whatsapp}</p>
+              <p className="text-xl font-bold sm:text-2xl">
+                {loading ? "Loading..." : info?.customer?.full_name || "---"}
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 sm:text-base">
+                {loading ? "Loading..." : info?.customer?.whatsapp || "---"}
+              </p>
             </div>
           </div>
 
           <section className="mt-6 space-y-5 sm:mt-8">
             <div className="space-y-4">
               <label className="block">
-                <span className="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-300">Full Name</span>
+                <span className="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-300">
+                  Full Name
+                </span>
                 <input
                   className="form-input h-12 w-full rounded-xl border border-gray-300 bg-gray-50 p-3 text-base text-gray-900 placeholder:text-gray-400 focus:border-gray-300 focus:outline-0 focus:ring-2 focus:ring-[var(--color-primary)] dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
-                  value={info.customer.full_name}
+                  value={loading ? "Loading..." : info?.customer?.full_name || "---"}
                   readOnly
                 />
               </label>
 
               <label className="block">
-                <span className="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-300">Email</span>
+                <span className="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-300">
+                  Email
+                </span>
                 <input
                   type="email"
                   className="form-input h-12 w-full rounded-xl border border-gray-300 bg-gray-50 p-3 text-base text-gray-900 placeholder:text-gray-400 focus:border-gray-300 focus:outline-0 focus:ring-2 focus:ring-[var(--color-primary)] dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
-                  value={info.customer.email}
+                  value={loading ? "Loading..." : info?.customer?.email || "---"}
                   readOnly
                 />
               </label>
 
               <label className="block">
-                <span className="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-300">Room Number</span>
+                <span className="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-300">
+                  Room Number
+                </span>
                 <input
                   className="form-input h-12 w-full rounded-xl border border-gray-300 bg-gray-50 p-3 text-base text-gray-900 placeholder:text-gray-400 focus:border-gray-300 focus:outline-0 focus:ring-2 focus:ring-[var(--color-primary)] dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
-                  value={info.room_no}
+                  value={loading ? "Loading..." : info?.room_no || "---"}
                   readOnly
                 />
               </label>
 
               <label className="block">
-                <span className="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-300">Room Category</span>
+                <span className="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-300">
+                  Room Category
+                </span>
                 <input
                   className="form-input h-12 w-full rounded-xl border border-gray-300 bg-gray-50 p-3 text-base text-gray-900 placeholder:text-gray-400 focus:border-gray-300 focus:outline-0 focus:ring-2 focus:ring-[var(--color-primary)] dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
-                  value={info.room_type}
+                  value={loading ? "Loading..." : info?.room_type || "---"}
                   readOnly
                 />
               </label>
 
               <label className="block">
-                <span className="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-300">Check In</span>
+                <span className="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-300">
+                  Check In
+                </span>
                 <input
                   className="form-input h-12 w-full rounded-xl border border-gray-300 bg-gray-50 p-3 text-base text-gray-900 placeholder:text-gray-400 focus:border-gray-300 focus:outline-0 focus:ring-2 focus:ring-[var(--color-primary)] dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
-                  value={info.checkin_datetime_only_display}
+                  value={loading ? "Loading..." : info?.checkin_datetime_only_display || "---"}
                   readOnly
                 />
               </label>
 
               <label className="block">
-                <span className="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-300">Check Out</span>
+                <span className="mb-1 block text-sm font-medium text-gray-600 dark:text-gray-300">
+                  Check Out
+                </span>
                 <input
                   className="form-input h-12 w-full rounded-xl border border-gray-300 bg-gray-50 p-3 text-base text-gray-900 placeholder:text-gray-400 focus:border-gray-300 focus:outline-0 focus:ring-2 focus:ring-[var(--color-primary)] dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
-                  value={info.checkout_datetime_only_display}
+                  value={loading ? "Loading..." : info?.checkout_datetime_only_display || "---"}
                   readOnly
                 />
               </label>
@@ -193,13 +216,15 @@ export default function ProfilePage() {
         </div>
       </main>
 
-      <footer className="sticky bottom-0 z-10 bg-white/90 backdrop-blur dark:bg-gray-950/90" style={{ paddingBottom: "calc(1rem + var(--safe-bottom))" }}>
+      <footer
+        className="sticky bottom-0 z-10 bg-white/90 backdrop-blur dark:bg-gray-950/90"
+        style={{ paddingBottom: "calc(1rem + var(--safe-bottom))" }}
+      >
         <div className="mx-auto max-w-screen-sm px-4 sm:px-6">
           <div className="py-3">
-            {/* how to disable if noDetails is true*/}
             <Button
               onClick={() => fetchCheckinData(1)}
-              disabled={noDetails} // ✅ disable if noDetails is true
+              disabled={noDetails}
               className={noDetails ? "opacity-50 cursor-not-allowed" : ""}
             >
               Enter
