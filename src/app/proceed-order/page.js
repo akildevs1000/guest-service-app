@@ -109,7 +109,7 @@ export default function ProceedOrderPage() {
                                 </div>
                                 <div className="flex flex-col items-end min-w-[80px]">
                                     <p className="text-sm text-gray-500 dark:text-[#9eb7a8]">Qty: {item.qty}</p>
-                                    <p className="text-gray-900 dark:text-white font-bold text-lg">${(item.amount * item.qty).toFixed(2)}</p>
+                                    <p className="text-gray-900 dark:text-white font-bold text-lg">₹{(item.amount * item.qty).toFixed(2)}</p>
                                 </div>
                             </div>
                         ))}

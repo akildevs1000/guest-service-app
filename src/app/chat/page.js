@@ -607,7 +607,11 @@ export default function Chat() {
                         {!draft && !recording && !audioBlob && (
                             <button
                                 className="bg-[var(--color-primary)] rounded-full w-12 h-12 flex items-center justify-center text-black hover:bg-opacity-80 transition-colors flex-shrink-0"
-                                onClick={startRec}
+                                onMouseDown={startRec}
+                                onTouchStart={startRec}
+                                onMouseUp={stopRec}
+                                onTouchEnd={stopRec}
+                                title="Hold to record, release to send"
                             >
                                 <span className="material-symbols-outlined text-base">mic</span>
                             </button>
