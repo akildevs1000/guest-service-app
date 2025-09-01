@@ -6,7 +6,6 @@ import axios from "axios";
 import api from "../lib/api";
 
 import { useInfo } from "../contexts/InfoContext"
-import Loader from "../Components/Loader";
 
 const MQTT_URL = "wss://mqtt.xtremeguard.org:8084";
 
@@ -118,11 +117,17 @@ export default function Chat() {
         guestName: "Mr.New User"
     });
 
+    const [me, setMe] = useState("");
+    const [msgTopic, setMsgTopic] = useState("");
+    const [typingTopic, setTypingTopic] = useState("");
+    const [ackTopic, setAckTopic] = useState("");
+
     useEffect(() => {
         if (info) {
             const customer = info?.customer || {};
             const title = customer.title || "Mr";
             const full_name = customer.full_name || "New User";
+
             setChatInfo({
                 hotelId: info.company_id || 0,
                 bookingId: info.booking_id || 0,
@@ -134,19 +139,26 @@ export default function Chat() {
                 full_name,
                 guestName: title + "." + full_name
             });
+
+
+            setMe(`${info.room_no}:${title + "." + full_name}`);
+            setMsgTopic(`chat/hotel/${info.company_id}/room/${String(info.record_id)}/message`);
+            setTypingTopic(`chat/hotel/${info.company_id}/room/${String(info.record_id)}/typing`);
+            setAckTopic(`chat/hotel/${info.company_id}/room/${String(info.record_id)}/ack`);
+
+            async function loadHistory() {
+                try {
+                    const q = `?company_id=${info.company_id}&role=guest&booking_room_id=${info.record_id}&limit=50`;
+                    const rows = await api.get(`/chat_messages_history${q}`);
+                    setMessages(
+                        (rows.data || []).sort((a, b) => (a.tsDb || 0) - (b.tsDb || 0))
+                    );
+                    setTimeout(scrollToEnd, 100);
+                } catch { }
+            }
+            loadHistory();
         }
     }, [info]);
-
-    useEffect(() => {
-        console.log("🚀 ~ info:", info);
-        console.log("🚀 ~ Chat ~ hotelId:", chatInfo.hotelId);
-        console.log("🚀 ~ Chat ~ bookingId:", chatInfo.bookingId);
-        console.log("🚀 ~ Chat ~ bookingRoomId:", chatInfo.bookingRoomId);
-        console.log("🚀 ~ Chat ~ roomId:", chatInfo.roomId);
-        console.log("🚀 ~ Chat ~ roomNumber:", chatInfo.roomNumber);
-        console.log("🚀 ~ Chat ~ guestName:", chatInfo.guestName);
-    }, [info, chatInfo]);
-
 
     // Removed duplicate useState declarations below (was causing redeclaration errors)
     const [draft, setDraft] = useState("");
@@ -169,30 +181,14 @@ export default function Chat() {
     const fileInputRef = useRef();
     const messageInputRef = useRef();
 
-    const me = `${chatInfo.roomNumber}:${chatInfo.guestName}`;
-    const msgTopic = `chat/hotel/${chatInfo.hotelId}/room/${String(chatInfo.bookingRoomId)}/message`;
-    const typingTopic = `chat/hotel/${chatInfo.hotelId}/room/${String(chatInfo.bookingRoomId)}/typing`;
-    const ackTopic = `chat/hotel/${chatInfo.hotelId}/room/${String(chatInfo.bookingRoomId)}/ack`;
-
-    // Load history
-    useEffect(() => {
-        async function loadHistory() {
-            try {
-                const q = `?company_id=${chatInfo.hotelId}&role=guest&booking_room_id=${chatInfo.bookingRoomId}&limit=50`;
-                const rows = await api.get(`/chat_messages_history${q}`);
-                console.log("🚀 ~ loadHistory ~ rows:", rows)
-                setMessages(
-                    (rows.data || []).sort((a, b) => (a.tsDb || 0) - (b.tsDb || 0))
-                );
-                setTimeout(scrollToEnd, 100);
-            } catch { }
-        }
-        loadHistory();
-        // eslint-disable-next-line
-    }, [chatInfo.hotelId, chatInfo.bookingRoomId]);
-
     // MQTT subscriptions
     useEffect(() => {
+
+        console.log("🚀 ~ Chat ~ me:", me)
+        console.log("🚀 ~ Chat ~ msgTopic:", msgTopic)
+        console.log("🚀 ~ Chat ~ typingTopic:", typingTopic)
+        console.log("🚀 ~ Chat ~ ackTopic:", ackTopic)
+
         // Message subscription
         const unsubMsg = sub(msgTopic, (m) => {
             if (!m) return;
@@ -600,7 +596,32 @@ export default function Chat() {
                                     : "bg-gray-900 text-white rounded-tl-none"
                                     }`}
                             >
-                                <p className="text-white">{msg.text}</p>
+                                {msg.type === "text" && <p className="text-white">{msg.text}</p>}
+
+                                {msg.type === "file" && (
+                                    <div style={{ textAlign: "center" }}>
+                                        <img
+                                            src={msg.url}
+                                            alt="file"
+                                            onClick={() => viewImage(msg.id, msg.url)}
+                                            style={{
+                                                margin: "auto",
+                                                width: 100,
+                                                borderRadius: 10,
+                                                textAlign: "right",
+                                            }}
+                                        />
+                                    </div>
+                                )}
+                                {/* {msg.type === "audio" && (
+                                    <audio
+                                        style={{ height: 28 }}
+                                        src={msg.url}
+                                        controls
+                                        controlsList="nodownload"
+                                        preload="none"
+                                    ></audio>
+                                )} */}
                             </div>
                         </div>
                     </div>
@@ -649,64 +670,6 @@ export default function Chat() {
                     </div>
                 )}
                 {/* Messages */}
-                {/* <div ref={listRef} className="chat-body" style={{ maxHeight: 400, overflowY: "auto" }}>
-                    {messages.length === 0 && <div className="flex">No Chat History is available</div>}
-                    {messages.map((m) => (
-                        <div
-                            key={m.id}
-                            className={`msg ${m.role === "guest" ? "me" : "them"}`}
-                        >
-                            <div className="bubble">
-                                <div className="meta">
-                                    <span className="sender">{prettySender(m.sender)}</span>
-                                </div>
-                                {m.type === "text" && <div>{m.text}</div>}
-                                {m.type === "file" && (
-                                    <div style={{ textAlign: "center" }}>
-                                        <img
-                                            src={m.url}
-                                            alt="file"
-                                            onClick={() => viewImage(m.id, m.url)}
-                                            style={{
-                                                margin: "auto",
-                                                width: 100,
-                                                borderRadius: 10,
-                                                textAlign: "right",
-                                            }}
-                                        />
-                                    </div>
-                                )}
-                                {m.type === "audio" && (
-                                    <audio
-                                        style={{ height: 28 }}
-                                        src={m.url}
-                                        controls
-                                        controlsList="nodownload"
-                                        preload="none"
-                                    ></audio>
-                                )}
-                                <div
-                                    style={{
-                                        textAlign: m.role === "guest" ? "right" : "left",
-                                    }}
-                                >
-                                    <span
-                                        className="sender"
-                                        style={{
-                                            paddingTop: 5,
-                                            color: "#838383",
-                                            fontSize: 10,
-                                        }}
-                                    >
-                                        {time(m.ts)}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                </div> */}
-                {/* Composer */}
-
 
                 <footer className="bg-white/90 backdrop-blur-sm p-4 sticky bottom-0 dark:bg-gray-950/90">
                     <div className="flex items-center gap-2 relative">
@@ -729,12 +692,37 @@ export default function Chat() {
 
                         {/* Camera & Mic buttons */}
                         <div className="absolute right-14 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                            <button className="rounded-full w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">
+                            <input
+                                style={{ display: "none" }}
+                                accept="image/*"
+                                type="file"
+                                ref={fileInputRef}
+                                onChange={handleFileSelect}
+                            />
+                            <button onClick={() => fileInputRef.current && fileInputRef.current.click()} className="rounded-full w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">
                                 <span className="material-symbols-outlined text-base">photo_camera</span>
                             </button>
-                            <button className="rounded-full w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">
-                                <span className="material-symbols-outlined text-base">mic</span>
-                            </button>
+
+                            {/* {selectedFile && (
+                                <button className="rounded-full w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">
+                                    <span className="material-symbols-outlined text-base">eye</span>
+                                </button>
+                            )} */}
+
+                            {!recording ? (
+
+                                <button onClick={startRec} disabled={recording} className="rounded-full w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">
+                                    <span className="material-symbols-outlined text-base">mic</span>
+                                </button>
+
+                            ) : (
+                                <button onClick={stopRec} disabled={!recording} className="rounded-full w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">
+                                    <span className="material-symbols-outlined text-base">mic</span>
+                                    {/* <span>{recording && seconds + "s"}</span> */}
+                                </button>
+                            )}
+
+
                         </div>
 
                         {/* Send button */}
@@ -745,51 +733,8 @@ export default function Chat() {
                             <span className="material-symbols-outlined">send</span>
                         </button>
                     </div>
-                </footer>
 
-                <div className="composer mt-3 flex1 gap-2" style={{ display: "flex", alignItems: "center" }}>
-                    {/* 
-                    <button
-                        style={{ color: selectedFile ? "blue" : "black", marginLeft: 4 }}
-                        onClick={() => fileInputRef.current && fileInputRef.current.click()}
-                    >
-                        📎
-                    </button>
-                    {selectedFile && (
-                        <button style={{ color: "red" }} onClick={() => setSelectedFile(null)}>
-                            🗑️
-                        </button>
-                    )} */}
-                    <div style={{ margin: "auto" }}>
-                        {/* {!recording ? (
-                            <button
-                                style={{ color: "black", marginTop: 4 }}
-                                onClick={startRec}
-                                disabled={recording}
-                            >
-                                🎤
-                            </button>
-                        ) : (
-                            <span style={{ width: recording ? 120 : 50 }}>
-                                <button
-                                    style={{ color: "red", marginTop: 4 }}
-                                    onClick={stopRec}
-                                    disabled={!recording}
-                                >
-                                    🎤
-                                </button>
-                                <span>{recording && seconds + "s"}</span>
-                            </span>
-                        )} */}
-                    </div>
-                    <input
-                        style={{ display: "none" }}
-                        accept="image/*"
-                        type="file"
-                        ref={fileInputRef}
-                        onChange={handleFileSelect}
-                    />
-                </div>
+                </footer>
             </div>
         </div>
 
