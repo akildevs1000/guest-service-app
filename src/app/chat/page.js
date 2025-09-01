@@ -313,6 +313,7 @@ export default function Chat() {
     }
 
     function handleFileSelect(e) {
+        console.log("🚀 ~ handleFileSelect ~ e.target.files[0]:", e.target.files[0])
         setSelectedFile(e.target.files[0] || null);
     }
 
@@ -388,7 +389,7 @@ export default function Chat() {
             form.append("room_id", chatInfo.roomId);
             form.append("room_number", chatInfo.roomNumber);
             form.append("company_id", chatInfo.hotelId);
-            const res = await axios.post("/chat_messages_upload_file", form);
+            const res = await api.post("/chat_messages_upload_file", form);
             const url = res && res.data.message.url;
             if (url === "null") {
                 alert("File Upload Failed");
@@ -499,7 +500,7 @@ export default function Chat() {
                 blob,
                 `voice_${bookingRoomId}.${fileExt(blob.type)}`
             );
-            const res = await axios.post("/chat_messages_upload_file", form);
+            const res = await api.post("/chat_messages_upload_file", form);
             const url = res && res.data.message.url;
             if (url === "null") {
                 alert("File Upload Failed");
