@@ -606,12 +606,13 @@ export default function Chat() {
 
                         {!draft && !recording && !audioBlob && (
                             <button
-                                className="bg-[var(--color-primary)] rounded-full w-12 h-12 flex items-center justify-center text-black hover:bg-opacity-80 transition-colors flex-shrink-0"
-                                onMouseDown={startRec}
-                                onTouchStart={startRec}
-                                onMouseUp={stopRec}
-                                onTouchEnd={stopRec}
+                                className="bg-[var(--color-primary)] rounded-full w-12 h-12 flex items-center justify-center text-black hover:bg-opacity-80 transition-colors flex-shrink-0 select-none"
+                                onMouseDown={e => { e.preventDefault(); startRec(); }}
+                                onTouchStart={e => { e.preventDefault(); startRec(); }}
+                                onMouseUp={e => { e.preventDefault(); if (recording) stopRec(); }}
+                                onTouchEnd={e => { e.preventDefault(); if (recording) stopRec(); }}
                                 title="Hold to record, release to send"
+                                style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
                             >
                                 <span className="material-symbols-outlined text-base">mic</span>
                             </button>
