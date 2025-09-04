@@ -137,7 +137,7 @@ export default function FoodItemsPage() {
                                                 >
                                                     -
                                                 </button>
-                                                <span className="font-bold text-lg ">
+                                                <span className="font-bold text-lg px-4">
                                                     {cart[item.id].qty}
                                                 </span>
                                                 <button
