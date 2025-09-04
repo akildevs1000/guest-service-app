@@ -116,7 +116,7 @@ export default function FoodItemsPage() {
                                                 {item.description}
                                             </p>
                                             <p className="text-gray-900 dark:text-white font-bold mt-2">
-                                                ${item.amount}
+                                                ₹{item.amount}
                                             </p>
                                         </div>
                                         <div
