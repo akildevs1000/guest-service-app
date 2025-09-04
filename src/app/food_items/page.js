@@ -65,7 +65,7 @@ export default function FoodItemsPage() {
     }, [selectedCategory]);
 
     return (
-        <div className="relative flex min-h-screen flex-col bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100">
+        <div className="flex flex-col min-h-screen  bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100">
             <header className="flex items-center justify-between p-4 top-0 bg-[#111714]/80">
                 <button className="text-white" onClick={() => router.back()}>
                     <span className="material-symbols-outlined"> arrow_back </span>
